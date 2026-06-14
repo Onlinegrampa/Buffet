@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinSight — Financial Analysis Suite</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f0f2f5; }
+    .topbar {
+      background: linear-gradient(135deg, #0f1b2d 0%, #1a3a5c 100%);
+      color: white; padding: 16px 0;
+    }
+    .section-card { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.07); margin-bottom: 14px; }
+    .section-card .card-header {
+      background: #f8f9fa; border-radius: 12px 12px 0 0 !important;
+      cursor: pointer; font-weight: 600; padding: 12px 18px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .section-card .card-header:hover { background: #e9ecef; }
+
+    .stmt-table th {
+      background: #f8f9fa; font-size: .72rem; text-transform: uppercase;
+      color: #888; letter-spacing: .04em; white-space: nowrap;
+    }
+    .stmt-table th, .stmt-table td { padding: 5px 8px; vertical-align: middle; }
+    .stmt-table .item-name { font-size: .85rem; white-space: nowrap; }
+    .stmt-table .item-name.hl { font-weight: 600; }
+    .stmt-table tr.row-hl { background: #f0f4f8; }
+    .stmt-table input[type=number] {
+      text-align: right; font-size: .82rem; width: 100px;
+      border: 1px solid #dee2e6; border-radius: 5px; padding: 3px 6px; background: white;
+    }
+    .stmt-table input[type=number]:focus {
+      border-color: #4a90d9; outline: none; box-shadow: 0 0 0 2px rgba(74,144,217,.18);
+    }
+    .period-badge {
+      background: #e8f0fe; color: #1a3a5c; padding: 3px 8px;
+      border-radius: 5px; font-size: .75rem; font-weight: 600; white-space: nowrap;
+    }
+    .period-label-input {
+      font-size: .78rem; padding: 3px 7px; border-radius: 5px;
+      border: 1px solid #dee2e6; width: 88px; text-align: center;
+    }
+    .period-toggle .btn { font-size: .82rem; padding: 4px 11px; }
+
+    .submit-bar {
+      position: sticky; bottom: 0; background: white;
+      border-top: 1px solid #eee; padding: 10px 0;
+      box-shadow: 0 -2px 8px rgba(0,0,0,.06);
+    }
+    .hint { font-size: .75rem; color: #888; }
+    .chevron { transition: transform .2s; font-size: .8rem; }
+    .chevron.up { transform: rotate(0deg); }
+    .chevron.down { transform: rotate(-90deg); }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="container">
+    <h4 class="fw-bold mb-0">FinSight <span class="fw-light opacity-75 fs-6">— Financial Analysis Suite</span></h4>
+  </div>
+</div>
+
+<form action="/analyze" method="post" id="mainForm">
+<input type="hidden" name="n_periods" id="n_periods" value="2">
+
+<div class="container py-3">
+
+  <!-- ── Company + period setup ── -->
+  <div class="section-card card mb-3">
+    <div class="card-body px-4 py-3">
+
+      <div class="row g-3 align-items-end mb-3">
+        <div class="col-md-5">
+          <label class="form-label fw-semibold small mb-1">Company Name</label>
+          <input type="text" name="company_name" class="form-control" placeholder="e.g. Apple Inc." required>
+        </div>
+        <div class="col-md-7">
+          <label class="form-label fw-semibold small mb-1">Number of periods to analyze</label>
+          <div class="period-toggle btn-group" role="group">
+            {% for n in range(2, max_periods + 1) %}
+            <button type="button" class="btn btn-outline-primary {{ 'active' if n == 2 else '' }}"
+                    data-count="{{ n }}" onclick="setPeriods({{ n }})">{{ n }}</button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Period label inputs — shown/hidden by JS -->
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="hint me-1">Period labels:</span>
+        {% for i in range(max_periods) %}
+        <div class="period-label-wrap" data-min-count="{{ i + 1 }}">
+          <input type="text" name="period_{{ i }}"
+                 id="period-label-{{ i }}"
+                 value="{{ default_period_labels[i] }}"
+                 class="period-label-input"
+                 placeholder="Period {{ i }}">
+        </div>
+        {% endfor %}
+      </div>
+      <p class="hint mt-2 mb-0">All values in $millions. Blank = 0. Enter CapEx and Treasury Stock as positive numbers.</p>
+    </div>
+  </div>
+
+  <!-- ── Statement section macro ── -->
+  {% macro stmt_section(title, icon, items, prefix, open) %}
+  <div class="section-card card">
+    <div class="card-header" data-bs-toggle="collapse" data-bs-target="#{{ prefix }}-body"
+         aria-expanded="{{ 'true' if open else 'false' }}">
+      <span>{{ icon }} {{ title }}</span>
+      <span class="chevron {{ 'up' if open else 'down' }}">&#9660;</span>
+    </div>
+    <div id="{{ prefix }}-body" class="collapse {{ 'show' if open else '' }}">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 stmt-table">
+            <thead>
+              <tr>
+                <th style="min-width:220px">Line Item</th>
+                {% for i in range(max_periods) %}
+                <th class="text-end period-col" data-period-idx="{{ i }}">
+                  <span class="period-badge" id="{{ prefix }}-hdr-{{ i }}">{{ default_period_labels[i] }}</span>
+                </th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+              {% set item_idx = loop.index0 %}
+              {% set is_hl = item in highlight %}
+              <tr class="{{ 'row-hl' if is_hl else '' }}">
+                <td class="item-name {{ 'hl' if is_hl else '' }}">{{ item }}</td>
+                {% for p_idx in range(max_periods) %}
+                <td class="text-end period-col" data-period-idx="{{ p_idx }}">
+                  <input type="number"
+                         name="{{ prefix }}_{{ item_idx }}_{{ p_idx }}"
+                         id="{{ prefix }}-{{ item_idx }}-{{ p_idx }}"
+                         step="0.01" placeholder="0">
+                </td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endmacro %}
+
+  {{ stmt_section("Balance Sheet",       "📊", balance_sheet,    "bs",  true) }}
+  {{ stmt_section("Income Statement",    "📈", income_statement, "inc", true) }}
+  {{ stmt_section("Cash Flow Statement", "💵", cash_flow,        "cf",  true) }}
+
+  <div style="height:70px"></div>
+</div><!-- /container -->
+
+<!-- Sticky submit bar -->
+<div class="submit-bar">
+  <div class="container d-flex justify-content-between align-items-center">
+    <p class="mb-0 hint">Enter numbers from your financial report, then click Analyze.</p>
+    <button type="submit" class="btn btn-primary px-5">Analyze &rarr;</button>
+  </div>
+</div>
+</form>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  let activePeriods = 2;
+
+  function setPeriods(n) {
+    activePeriods = n;
+    document.getElementById('n_periods').value = n;
+
+    // Toggle active button
+    document.querySelectorAll('[data-count]').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.count) === n);
+    });
+
+    // Show/hide period columns in all tables
+    document.querySelectorAll('.period-col').forEach(el => {
+      el.style.display = parseInt(el.dataset.periodIdx) < n ? '' : 'none';
+    });
+
+    // Show/hide period label inputs
+    document.querySelectorAll('.period-label-wrap').forEach(el => {
+      el.style.display = parseInt(el.dataset.minCount) <= n ? '' : 'none';
+    });
+  }
+
+  // Sync period label inputs → column headers
+  function syncHeaders() {
+    for (let i = 0; i < {{ max_periods }}; i++) {
+      const input = document.getElementById('period-label-' + i);
+      const label = input ? (input.value.trim() || 'Period ' + i) : ('Period ' + i);
+      document.querySelectorAll('[id$="-hdr-' + i + '"]').forEach(el => el.textContent = label);
+    }
+  }
+
+  document.querySelectorAll('.period-label-input').forEach(input => {
+    input.addEventListener('input', syncHeaders);
+  });
+
+  // Accordion chevron
+  document.querySelectorAll('.card-header[data-bs-toggle]').forEach(header => {
+    const target = document.querySelector(header.dataset.bsTarget);
+    const chevron = header.querySelector('.chevron');
+    target.addEventListener('show.bs.collapse', () => chevron.classList.replace('down','up'));
+    target.addEventListener('hide.bs.collapse', () => chevron.classList.replace('up','down'));
+  });
+
+  // Init — default 2 periods
+  setPeriods(2);
+  syncHeaders();
+</script>
+</body>
+</html>
