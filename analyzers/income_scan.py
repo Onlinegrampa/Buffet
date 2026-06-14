@@ -94,6 +94,47 @@ def _report(name: str, cur: dict, pri: dict) -> None:
     console.print(f"\n  {raised} of 4 flags raised. [dim]Yellow = worth a closer look.[/]")
 
 
+def compute(profile) -> dict:
+    d = profile.income_scan_inputs()
+    cur, pri = d["current"], d["prior"]
+    mc, mp = _margins(cur), _margins(pri)
+
+    margin_rows = [
+        {"label": "Gross Margin",      "cur": mc["gross"],     "pri": mp["gross"],     "good_up": True},
+        {"label": "Operating Margin",  "cur": mc["operating"], "pri": mp["operating"], "good_up": True},
+        {"label": "Net Margin",        "cur": mc["net"],       "pri": mp["net"],       "good_up": True},
+        {"label": "SG&A % of Revenue", "cur": mc["sga_pct"],   "pri": mp["sga_pct"],   "good_up": False},
+    ]
+
+    growth = percent_change(cur["revenue"], pri["revenue"])
+    if growth is None:   band_cls, band_txt = "secondary", "n/a"
+    elif growth >= 25:   band_cls, band_txt = "success", f"Rapid growth (+{growth:.1f}%)"
+    elif growth <= 10:   band_cls, band_txt = "warning",  f"Slow growth ({growth:+.1f}%)"
+    else:                band_cls, band_txt = "primary",   f"Moderate growth ({growth:+.1f}%)"
+
+    compressed = [k for k in ("gross", "operating", "net")
+                  if mc[k] is not None and mp[k] is not None and mc[k] < mp[k]]
+    sga_up = mc["sga_pct"] is not None and mp["sga_pct"] is not None and mc["sga_pct"] > mp["sga_pct"]
+    int_up = cur["interest"] > pri["interest"]
+    sh_growth = percent_change(cur["shares"], pri["shares"])
+    dil = sh_growth is not None and sh_growth > 2
+
+    sga_detail = (f'{mp["sga_pct"]:.1f}% -> {mc["sga_pct"]:.1f}%'
+                  if mc["sga_pct"] is not None and mp["sga_pct"] is not None else "n/a")
+    flags = [
+        {"label": "Margins compressing",     "detail": ", ".join(compressed) or "none",              "status": "FLAG" if compressed else "OK"},
+        {"label": "SG&A creeping up",        "detail": sga_detail,                                   "status": "FLAG" if sga_up else "OK"},
+        {"label": "Interest expense rising", "detail": f'${pri["interest"]:,.1f}M -> ${cur["interest"]:,.1f}M', "status": "WATCH" if int_up else "OK"},
+        {"label": "Share dilution",          "detail": f"{sh_growth:+.1f}% YoY" if sh_growth is not None else "n/a", "status": "FLAG" if dil else "OK"},
+    ]
+
+    return {
+        "margins": margin_rows, "growth": growth,
+        "band_cls": band_cls, "band_txt": band_txt,
+        "flags": flags, "flags_raised": sum(1 for f in flags if f["status"] in ("FLAG", "WATCH")),
+    }
+
+
 def run() -> None:
     console.rule("[bold magenta]Module 9 — Income Statement Scanner[/]")
     profile = get_profile()

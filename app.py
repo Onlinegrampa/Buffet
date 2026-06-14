@@ -7,14 +7,21 @@ from datetime import datetime
 
 from flask import Flask, render_template, request, Response
 
+from analyzers.balance_health import compute as balance_health_compute
 from analyzers.buffett import compute as buffett_compute
+from analyzers.ccc import compute as ccc_compute
+from analyzers.consistency import compute as consistency_compute
+from analyzers.income_scan import compute as income_scan_compute
+from analyzers.leverage import compute as leverage_compute
 from analyzers.saas import compute as saas_compute
+from analyzers.stage import compute as stage_compute
 from analyzers.statements import (
     BALANCE_SHEET,
     CASH_FLOW,
     INCOME_STATEMENT,
     compute as stmt_compute,
 )
+from analyzers.survival import compute as survival_compute
 from utils.profile import CompanyProfile
 
 app = Flask(__name__)
@@ -92,15 +99,23 @@ def _run_analysis(request_form) -> dict:
     profile.income_statement = parse_stmt("inc", INCOME_STATEMENT)
     profile.cash_flow        = parse_stmt("cf",  CASH_FLOW)
 
-    stmt = stmt_compute(profile)
-    buft = buffett_compute(profile.name, profile.buffett_inputs())
+    stmt   = stmt_compute(profile)
+    buft   = buffett_compute(profile.name, profile.buffett_inputs())
 
-    r40 = profile.rule_of_40_inputs()
+    r40    = profile.rule_of_40_inputs()
     growth = r40["growth"] if r40["growth"] is not None else 0.0
     saas_results = {
         label: saas_compute(profile.name, growth, (m if m is not None else 0.0), label)
         for label, m in r40["margins"].items()
     }
+
+    stage       = stage_compute(profile)
+    survival    = survival_compute(profile)
+    ccc         = ccc_compute(profile)
+    leverage    = leverage_compute(profile)
+    bhealth     = balance_health_compute(profile)
+    income_scan = income_scan_compute(profile)
+    consistency = consistency_compute(profile)
 
     return dict(
         company=name,
@@ -109,6 +124,13 @@ def _run_analysis(request_form) -> dict:
         buft=buft,
         saas_results=saas_results,
         growth=growth,
+        stage=stage,
+        survival=survival,
+        ccc=ccc,
+        leverage=leverage,
+        bhealth=bhealth,
+        income_scan=income_scan,
+        consistency=consistency,
         unit_label=unit_label,
         generated=datetime.now().strftime("%B %d, %Y at %I:%M %p"),
     )

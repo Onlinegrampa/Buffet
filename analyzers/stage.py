@@ -101,6 +101,13 @@ def _run_modules(keys: list[str]) -> None:
             runner()
 
 
+def compute(profile) -> dict:
+    d = profile.stage_inputs()
+    stage, signals = _classify(d)
+    label, recommended, _ = STAGE_ANALYSIS[stage]
+    return {"stage": stage, "label": label, "recommended": recommended, "signals": signals}
+
+
 def run() -> None:
     console.rule("[bold magenta]Module 4 — Business Stage Classifier[/]")
     name, d = _gather()

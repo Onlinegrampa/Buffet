@@ -75,6 +75,49 @@ def _report(name: str, d: dict) -> None:
     )
 
 
+def compute(profile) -> dict:
+    d = profile.survival_inputs()
+    cash, fcf = d["cash"], d["fcf"]
+    shares_growth = d["shares_growth"]
+    financing = d.get("cash_from_financing", 0.0)
+
+    if fcf >= 0:
+        runway = None
+        verdict_label, verdict_cls = "SAFE", "success"
+        verdict_msg = "FCF is positive — company is not burning cash. Survival risk is low."
+    else:
+        burn = abs(fcf)
+        runway = cash / burn if burn > 0 else float("inf")
+        lbl, color, msg = _verdict(runway)
+        verdict_label, verdict_msg = lbl, msg
+        verdict_cls = "danger" if color == "red" else ("success" if lbl == "SAFE" else "warning")
+
+    if shares_growth is None:
+        dil_cls, dil_msg = "secondary", "Share count change: n/a"
+    elif shares_growth > 2:
+        dil_cls = "danger"
+        dil_msg = f"Dilution: share count +{shares_growth:.1f}% YoY — issuing equity erodes shareholders."
+    elif shares_growth < 0:
+        dil_cls = "success"
+        dil_msg = f"Buybacks: share count {shares_growth:.1f}% YoY — returning capital to shareholders."
+    else:
+        dil_cls, dil_msg = "secondary", f"Minimal dilution: {shares_growth:+.1f}% YoY"
+
+    fin_note = None
+    if financing > 0:
+        pct = (financing / cash * 100) if cash else 0
+        fin_note = f"Cash from financing ${financing:,.1f}M ({pct:.0f}% of ending cash) — dependent on external capital."
+    elif financing < 0:
+        fin_note = f"Cash from financing ${financing:,.1f}M — net debt repayment / buybacks."
+
+    return {
+        "cash": cash, "fcf": fcf, "runway": runway,
+        "positive_fcf": fcf >= 0,
+        "verdict_label": verdict_label, "verdict_cls": verdict_cls, "verdict_msg": verdict_msg,
+        "dil_cls": dil_cls, "dil_msg": dil_msg, "fin_note": fin_note,
+    }
+
+
 def run() -> None:
     console.rule("[bold magenta]Module 5 — Survival Analysis[/]")
     profile = get_profile()

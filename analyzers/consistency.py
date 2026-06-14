@@ -34,6 +34,37 @@ def _trend(series) -> str:
     return "rising" if clean[0] > clean[-1] else ("flat" if clean[0] == clean[-1] else "declining")
 
 
+def compute(profile) -> dict:
+    s = profile.consistency_series()
+
+    rows = [
+        {"label": "Gross Margin",     "threshold": "> 40%", "test": lambda v: v > 40, "vals": s["gross_margin"], "fmt": "pct"},
+        {"label": "Operating Margin", "threshold": "> 0%",  "test": lambda v: v > 0,  "vals": s["operating_margin"], "fmt": "pct"},
+        {"label": "Net Margin",       "threshold": "> 20%", "test": lambda v: v > 20, "vals": s["net_margin"], "fmt": "pct"},
+        {"label": "EPS (positive)",   "threshold": "> 0",   "test": lambda v: v > 0,  "vals": s["eps"], "fmt": "num"},
+    ]
+    for row in rows:
+        vals = [v for v in row["vals"] if v is not None]
+        passed = sum(1 for v in vals if row["test"](v))
+        total = len(vals)
+        row["passed"], row["total"] = passed, total
+        row["verdict_cls"] = "success" if passed == total and total > 0 else ("warning" if passed > 0 else "danger")
+
+    def trend(series):
+        clean = [x for x in series if x is not None]
+        if len(clean) < 2:
+            return "n/a"
+        return "rising" if clean[0] > clean[-1] else ("flat" if clean[0] == clean[-1] else "declining")
+
+    return {
+        "labels": s["labels"],
+        "rows": rows,
+        "revenue_trend": trend(s["revenue"]),
+        "re_trend": trend(s["retained_earnings"]),
+        "period_count": profile.period_count,
+    }
+
+
 def run() -> None:
     console.rule("[bold magenta]Module 10 — Multi-Year Consistency Tracker[/]")
     profile = get_profile()

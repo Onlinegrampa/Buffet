@@ -105,6 +105,55 @@ def _report(name: str, cur: dict, pri: dict | None = None) -> None:
     )
 
 
+def compute(profile) -> dict:
+    d = profile.balance_health_inputs()
+    cur, pri = d["current"], d["prior"]
+    rc, rp = _ratios(cur), _ratios(pri)
+
+    def _sig(key, good_fn):
+        v = rc[key]
+        cls, txt = good_fn(v)
+        return {"cur": v, "pri": rp[key], "sig_cls": cls, "sig_txt": txt}
+
+    ratio_rows = [
+        {"label": "Current Ratio",   "formula": "Current Assets / Current Liabilities", "threshold": ">= 2.0",
+         **_sig("current_ratio",
+                lambda v: ("ok","OK") if v and v >= 2 else (("warn","WATCH") if v and v >= 1 else ("bad","DANGER")))},
+        {"label": "Quick Ratio",     "formula": "(Current Assets - Inventory) / CL",    "threshold": ">= 1.0",
+         **_sig("quick_ratio",
+                lambda v: ("ok","OK") if v and v >= 1 else (("warn","WATCH") if v and v >= 0.7 else ("bad","DANGER")))},
+        {"label": "Debt / Equity",   "formula": "Total Liabilities / Equity",           "threshold": "< 0.8",
+         **_sig("debt_to_equity",
+                lambda v: ("ok","OK") if v is not None and v < 0.8 else (("warn","WATCH") if v is not None and v < 1.5 else ("bad","HIGH")))},
+        {"label": "Debt / Assets %", "formula": "Total Liabilities / Total Assets",     "threshold": "< 50%",
+         **_sig("debt_to_assets",
+                lambda v: ("ok","OK") if v is not None and v < 50 else (("warn","WATCH") if v is not None and v < 70 else ("bad","HIGH")))},
+    ]
+
+    flags = []
+    cr = rc["current_ratio"]
+    if cr is not None and cr < 1.0:
+        flags.append({"cls": "danger", "title": "Liquidity danger",
+                      "detail": f"Current ratio {cr:.2f} < 1.0 — cannot cover near-term obligations."})
+
+    gw_pct = safe_pct(cur["goodwill"] + cur["intangibles"], cur["total_assets"])
+    if gw_pct is not None and gw_pct > 30:
+        flags.append({"cls": "warning", "title": "Goodwill / Intangibles overhang",
+                      "detail": f"{gw_pct:.0f}% of assets are goodwill + intangibles — impairment risk."})
+
+    da_c, da_p = rc["debt_to_assets"], rp["debt_to_assets"]
+    if da_c is not None and da_p is not None and da_c > da_p + 3:
+        flags.append({"cls": "warning", "title": "Rising leverage",
+                      "detail": f"Debt-to-assets rose {da_c - da_p:+.1f}pp YoY — balance sheet is getting heavier."})
+
+    eq_c, eq_p = cur["equity"], pri["equity"]
+    if eq_c < eq_p:
+        flags.append({"cls": "warning", "title": "Declining equity",
+                      "detail": f"Equity fell ${abs(eq_c - eq_p):,.1f}M YoY — check buybacks, losses, or goodwill write-downs."})
+
+    return {"ratios": ratio_rows, "flags": flags}
+
+
 def run() -> None:
     console.rule("[bold magenta]Module 8 — Balance Sheet Health Check[/]")
     profile = get_profile()

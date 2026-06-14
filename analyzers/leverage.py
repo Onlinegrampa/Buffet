@@ -94,6 +94,50 @@ def _report(name: str, cur: dict, pri: dict | None = None) -> None:
     )
 
 
+def compute(profile) -> dict:
+    v = profile._val
+    inc = profile.income_statement
+    cur = profile.leverage_inputs()
+    rev_p = v(inc, "Revenue", "prior")
+    gp_p  = v(inc, "Gross Profit", "prior")
+    oi_p  = v(inc, "Operating Income (EBIT)", "prior")
+    pri = {
+        "revenue": rev_p,
+        "gross_margin": safe_pct(gp_p, rev_p),
+        "operating_margin": safe_pct(oi_p, rev_p),
+        "operating_income": oi_p,
+    }
+
+    gm_c, om_c = cur["gross_margin"], cur["operating_margin"]
+    gm_p, om_p = pri["gross_margin"], pri["operating_margin"]
+    spread_c = (gm_c - om_c) if gm_c is not None and om_c is not None else None
+    spread_p = (gm_p - om_p) if gm_p is not None and om_p is not None else None
+
+    inc_gm = inc_om = signal = None
+    delta_rev = cur["revenue"] - pri["revenue"]
+    if abs(delta_rev) > 0.1 and cur["revenue"] and pri["revenue"]:
+        gp_c_val = cur["revenue"] * (gm_c or 0) / 100
+        gp_p_val = pri["revenue"] * (gm_p or 0) / 100
+        inc_gm = safe_pct(gp_c_val - gp_p_val, delta_rev)
+        inc_om = safe_pct(cur["operating_income"] - pri["operating_income"], delta_rev)
+        if inc_gm is not None and inc_om is not None:
+            if inc_gm >= 75 and inc_om >= 25:
+                signal = {"cls": "success", "text": "75/25 PASS — fixed costs scaling slower than revenue; meaningful operating leverage."}
+            elif inc_gm >= 50:
+                signal = {"cls": "warning", "text": "Partial leverage — gross profit expanding but fixed costs absorbing a large share of incremental revenue."}
+            else:
+                signal = {"cls": "danger", "text": "Weak leverage — fixed costs rising nearly as fast as revenue."}
+
+    return {
+        "rows": [
+            {"label": "Gross Margin",             "cur": gm_c,     "pri": gm_p,     "good_up": True},
+            {"label": "Operating Margin",          "cur": om_c,     "pri": om_p,     "good_up": True},
+            {"label": "Fixed Cost Layer (spread)", "cur": spread_c, "pri": spread_p, "good_up": False},
+        ],
+        "inc_gm": inc_gm, "inc_om": inc_om, "signal": signal,
+    }
+
+
 def run() -> None:
     console.rule("[bold magenta]Module 7 — Operating Leverage / Margin Expansion[/]")
     profile = get_profile()

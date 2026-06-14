@@ -82,15 +82,36 @@
 <div class="container my-4">
 
   <!-- Tab nav -->
-  <ul class="nav nav-tabs mb-4" id="mainTabs">
-    <li class="nav-item">
-      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-moat">🏰 Buffett Moat Scanner</button>
+  <ul class="nav nav-tabs mb-4 flex-nowrap overflow-auto" id="mainTabs" style="white-space:nowrap;">
+    <li class="nav-item flex-shrink-0">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-moat">🏰 Buffett</button>
     </li>
-    <li class="nav-item">
+    <li class="nav-item flex-shrink-0">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-r40">🚀 Rule of 40</button>
     </li>
-    <li class="nav-item">
-      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-stmt">📋 3-Statement Analysis</button>
+    <li class="nav-item flex-shrink-0">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-stmt">📋 Statements</button>
+    </li>
+    <li class="nav-item flex-shrink-0">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-stage">📍 Stage</button>
+    </li>
+    <li class="nav-item flex-shrink-0">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-survival">🔥 Survival</button>
+    </li>
+    <li class="nav-item flex-shrink-0">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ccc">🔄 Cash Cycle</button>
+    </li>
+    <li class="nav-item flex-shrink-0">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-leverage">📊 Leverage</button>
+    </li>
+    <li class="nav-item flex-shrink-0">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-bhealth">🏦 Balance Sheet</button>
+    </li>
+    <li class="nav-item flex-shrink-0">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-income">📝 Income Scan</button>
+    </li>
+    <li class="nav-item flex-shrink-0">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-consistency">📈 Consistency</button>
     </li>
   </ul>
 
@@ -303,6 +324,380 @@
       </div>
 
     </div><!-- /tab-stmt -->
+
+
+    <!-- ========== STAGE CLASSIFIER ========== -->
+    <div class="tab-pane fade" id="tab-stage">
+      <div class="row g-4">
+        <div class="col-md-5">
+          <div class="card h-100">
+            <div class="card-body text-center p-4">
+              <p class="section-label mb-2">Business Stage</p>
+              <div class="display-4 fw-bold text-primary mb-1">{{ stage.stage }}</div>
+              <div class="fs-4 fw-semibold mb-3">{{ stage.label }}</div>
+              <span class="badge bg-info text-dark fs-6 px-3 py-2">Stage {{ stage.stage }} of 6</span>
+              <hr class="my-3">
+              <p class="text-muted small mb-0"><strong>Recommended next:</strong><br>{{ stage.recommended }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div class="card h-100">
+            <div class="card-header"><strong>Classification Signals</strong></div>
+            <div class="card-body">
+              {% for s in stage.signals %}
+              <div class="d-flex gap-2 mb-2">
+                <span class="text-primary mt-1">&#9654;</span>
+                <span class="small">{{ s }}</span>
+              </div>
+              {% endfor %}
+              <p class="text-muted small mt-3 mb-0">Stage detection is a heuristic — confirm it against the business narrative before relying on it.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /tab-stage -->
+
+
+    <!-- ========== SURVIVAL ANALYSIS ========== -->
+    <div class="tab-pane fade" id="tab-survival">
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="card h-100">
+            <div class="card-body text-center p-4">
+              <p class="section-label mb-3">Runway Verdict</p>
+              <div class="fs-1 fw-bold text-{{ survival.verdict_cls }} mb-2">
+                {% if survival.positive_fcf %}FCF+{% elif survival.runway == none %}--{% else %}{{ "%.1f"|format(survival.runway) }}yr{% endif %}
+              </div>
+              <span class="badge bg-{{ survival.verdict_cls }} fs-6 px-3 py-2 mb-3">{{ survival.verdict_label }}</span>
+              <p class="small text-muted">{{ survival.verdict_msg }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div class="card h-100">
+            <div class="card-header"><strong>Cash &amp; Dilution Detail</strong></div>
+            <div class="card-body">
+              <div class="row g-3 mb-3">
+                <div class="col-6">
+                  <div class="text-muted small">Cash Position</div>
+                  <div class="fw-bold fs-5">{{ survival.cash | money }}</div>
+                </div>
+                <div class="col-6">
+                  <div class="text-muted small">Free Cash Flow</div>
+                  <div class="fw-bold fs-5 {{ 'text-success' if survival.fcf >= 0 else 'text-danger' }}">{{ survival.fcf | money }}/yr</div>
+                </div>
+              </div>
+              <div class="alert alert-{{ survival.dil_cls }} py-2 small mb-2">{{ survival.dil_msg }}</div>
+              {% if survival.fin_note %}
+              <div class="alert alert-warning py-2 small mb-0">{{ survival.fin_note }}</div>
+              {% endif %}
+              <p class="text-muted small mt-3 mb-0">Runway assumes constant burn rate. Include debt covenants and upcoming maturities in your own assessment.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /tab-survival -->
+
+
+    <!-- ========== CASH CONVERSION CYCLE ========== -->
+    <div class="tab-pane fade" id="tab-ccc">
+      <div class="card mb-4">
+        <div class="card-header"><strong>Cash Conversion Cycle</strong></div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0 stmt-table">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th style="color:#888;font-size:.75rem;">Formula</th>
+                  <th class="text-end">{{ periods[0] }}</th>
+                  {% if periods|length > 1 %}<th class="text-end">{{ periods[1] }}</th><th class="text-end">Change</th>{% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in ccc.rows %}
+                <tr class="{{ 'table-active fw-semibold' if loop.last else '' }}">
+                  <td>{{ row.label }}</td>
+                  <td class="text-muted small">{{ row.formula }}</td>
+                  <td class="text-end font-monospace small">{{ "%.1f d"|format(row.cur) if row.cur is not none else "n/a" }}</td>
+                  {% if periods|length > 1 %}
+                  <td class="text-end font-monospace small">{{ "%.1f d"|format(row.pri) if row.pri is not none else "n/a" }}</td>
+                  <td class="text-end font-monospace small
+                    {{ 'chg-pos' if row.cur is not none and row.pri is not none and row.cur < row.pri else ('chg-neg' if row.cur is not none and row.pri is not none and row.cur > row.pri else 'chg-neu') }}">
+                    {{ "%+.1f d"|format(row.cur - row.pri) if row.cur is not none and row.pri is not none else "n/a" }}
+                  </td>
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="alert alert-{{ ccc.interp_cls }}">{{ ccc.interp }}</div>
+      {% if ccc.trend %}
+      <p class="text-muted small">YoY trend: <strong>{{ "%+.1f"|format(ccc.trend.delta) }} days</strong> — {{ ccc.trend.direction }}.</p>
+      {% endif %}
+    </div><!-- /tab-ccc -->
+
+
+    <!-- ========== OPERATING LEVERAGE ========== -->
+    <div class="tab-pane fade" id="tab-leverage">
+      <div class="card mb-4">
+        <div class="card-header"><strong>Margin Comparison</strong></div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0 stmt-table">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th class="text-end">{{ periods[0] }}</th>
+                  {% if periods|length > 1 %}<th class="text-end">{{ periods[1] }}</th><th class="text-end">Change</th>{% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in leverage.rows %}
+                <tr>
+                  <td>{{ row.label }}</td>
+                  <td class="text-end font-monospace small">{{ "%.1f%%"|format(row.cur) if row.cur is not none else "n/a" }}</td>
+                  {% if periods|length > 1 %}
+                  <td class="text-end font-monospace small">{{ "%.1f%%"|format(row.pri) if row.pri is not none else "n/a" }}</td>
+                  {% set delta = row.cur - row.pri if row.cur is not none and row.pri is not none else none %}
+                  {% set is_good = (delta >= 0) == row.good_up if delta is not none else none %}
+                  <td class="text-end font-monospace small {{ 'chg-pos' if is_good else ('chg-neg' if is_good == false else 'chg-neu') }}">
+                    {{ "%+.1f pp"|format(delta) if delta is not none else "n/a" }}
+                  </td>
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% if leverage.inc_gm is not none %}
+      <div class="card mb-3">
+        <div class="card-header"><strong>Incremental Margins ({{ periods[0] }} vs {{ periods[1] if periods|length > 1 else 'prior' }})</strong></div>
+        <div class="card-body">
+          <div class="row g-3 text-center mb-3">
+            <div class="col-6">
+              <div class="text-muted small">Incremental Gross Margin</div>
+              <div class="fs-3 fw-bold {{ 'text-success' if leverage.inc_gm >= 75 else 'text-warning' }}">{{ "%.1f%%"|format(leverage.inc_gm) }}</div>
+              <div class="small text-muted">target >= 75%</div>
+            </div>
+            <div class="col-6">
+              <div class="text-muted small">Incremental Operating Margin</div>
+              <div class="fs-3 fw-bold {{ 'text-success' if leverage.inc_om >= 25 else 'text-warning' }}">{{ "%.1f%%"|format(leverage.inc_om) }}</div>
+              <div class="small text-muted">target >= 25%</div>
+            </div>
+          </div>
+          {% if leverage.signal %}
+          <div class="alert alert-{{ leverage.signal.cls }} mb-0">{{ leverage.signal.text }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      <p class="text-muted small">The fixed-cost layer = Gross Margin - Operating Margin. As revenue scales, a shrinking layer signals improving leverage.</p>
+    </div><!-- /tab-leverage -->
+
+
+    <!-- ========== BALANCE SHEET HEALTH ========== -->
+    <div class="tab-pane fade" id="tab-bhealth">
+      <div class="card mb-4">
+        <div class="card-header"><strong>Key Ratios</strong></div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0 stmt-table">
+              <thead>
+                <tr>
+                  <th>Ratio</th>
+                  <th style="color:#888;font-size:.75rem;">Formula</th>
+                  <th class="text-center">Target</th>
+                  <th class="text-end">{{ periods[0] }}</th>
+                  {% if periods|length > 1 %}<th class="text-end">{{ periods[1] }}</th>{% endif %}
+                  <th class="text-center">Signal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in bhealth.ratios %}
+                <tr>
+                  <td class="fw-medium">{{ r.label }}</td>
+                  <td class="text-muted small">{{ r.formula }}</td>
+                  <td class="text-center small">{{ r.threshold }}</td>
+                  <td class="text-end font-monospace small">{{ "%.2f"|format(r.cur) if r.cur is not none else "n/a" }}</td>
+                  {% if periods|length > 1 %}<td class="text-end font-monospace small">{{ "%.2f"|format(r.pri) if r.pri is not none else "n/a" }}</td>{% endif %}
+                  <td class="text-center">
+                    <span class="badge {{ 'badge-pass' if r.sig_cls == 'ok' else ('badge-warn' if r.sig_cls == 'warn' else 'badge-fail') }}">{{ r.sig_txt }}</span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><strong>Yellow Flags</strong></div>
+        <div class="card-body">
+          {% if bhealth.flags %}
+            {% for f in bhealth.flags %}
+            <div class="alert alert-{{ f.cls }} py-2 mb-2">
+              <strong>{{ f.title }}:</strong> {{ f.detail }}
+            </div>
+            {% endfor %}
+          {% else %}
+          <div class="alert alert-success py-2 mb-0">No yellow flags raised.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div><!-- /tab-bhealth -->
+
+
+    <!-- ========== INCOME STATEMENT SCANNER ========== -->
+    <div class="tab-pane fade" id="tab-income">
+      <div class="row g-4 mb-4">
+        <div class="col-md-3 text-center">
+          <div class="card h-100">
+            <div class="card-body d-flex flex-column align-items-center justify-content-center p-3">
+              <p class="section-label mb-2">Revenue Growth</p>
+              <div class="fs-2 fw-bold {{ 'text-success' if income_scan.growth and income_scan.growth >= 25 else ('text-warning' if income_scan.growth and income_scan.growth <= 10 else 'text-primary') }}">
+                {{ "%+.1f%%"|format(income_scan.growth) if income_scan.growth is not none else "n/a" }}
+              </div>
+              <span class="badge bg-{{ income_scan.band_cls }} mt-1">{{ income_scan.band_txt }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 text-center">
+          <div class="card h-100">
+            <div class="card-body d-flex flex-column align-items-center justify-content-center p-3">
+              <p class="section-label mb-2">Flags Raised</p>
+              <div class="fs-2 fw-bold {{ 'text-danger' if income_scan.flags_raised >= 2 else ('text-warning' if income_scan.flags_raised == 1 else 'text-success') }}">
+                {{ income_scan.flags_raised }} / 4
+              </div>
+              <span class="text-muted small">yellow flags</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header"><strong>Margin Trends</strong></div>
+        <div class="card-body p-0">
+          <table class="table table-sm mb-0 stmt-table">
+            <thead>
+              <tr>
+                <th>Margin</th>
+                <th class="text-end">{{ periods[0] }}</th>
+                {% if periods|length > 1 %}<th class="text-end">{{ periods[1] }}</th><th class="text-center">Trend</th>{% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in income_scan.margins %}
+              <tr>
+                <td>{{ row.label }}</td>
+                <td class="text-end font-monospace small">{{ "%.1f%%"|format(row.cur) if row.cur is not none else "n/a" }}</td>
+                {% if periods|length > 1 %}
+                <td class="text-end font-monospace small">{{ "%.1f%%"|format(row.pri) if row.pri is not none else "n/a" }}</td>
+                {% if row.cur is not none and row.pri is not none %}
+                  {% set up = row.cur > row.pri %}
+                  {% set good = up == row.good_up %}
+                  <td class="text-center {{ 'chg-pos' if good else 'chg-neg' }}">{{ '^' if up else 'v' }}</td>
+                {% else %}
+                  <td class="text-center chg-neu">--</td>
+                {% endif %}
+                {% endif %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><strong>Income Statement Yellow Flags</strong></div>
+        <div class="card-body p-0">
+          <table class="table table-sm mb-0 stmt-table">
+            <thead><tr><th>Flag</th><th>Detail</th><th class="text-center">Status</th></tr></thead>
+            <tbody>
+              {% for f in income_scan.flags %}
+              <tr>
+                <td class="fw-medium">{{ f.label }}</td>
+                <td class="text-muted small">{{ f.detail }}</td>
+                <td class="text-center">
+                  <span class="badge {{ 'badge-fail' if f.status == 'FLAG' else ('badge-warn' if f.status == 'WATCH' else 'badge-pass') }}">{{ f.status }}</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /tab-income -->
+
+
+    <!-- ========== CONSISTENCY TRACKER ========== -->
+    <div class="tab-pane fade" id="tab-consistency">
+      {% if consistency.period_count < 3 %}
+      <div class="alert alert-warning">
+        Only {{ consistency.period_count }} period{{ 's' if consistency.period_count != 1 else '' }} captured. Analyze 3+ periods for a meaningful consistency read.
+      </div>
+      {% endif %}
+      <div class="card mb-4">
+        <div class="card-header"><strong>Metric Consistency Across Periods</strong></div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0 stmt-table">
+              <thead>
+                <tr>
+                  <th>Metric (threshold)</th>
+                  {% for lbl in consistency.labels %}<th class="text-end">{{ lbl }}</th>{% endfor %}
+                  <th class="text-center">Holds</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in consistency.rows %}
+                <tr>
+                  <td>{{ row.label }} <span class="text-muted small">({{ row.threshold }})</span></td>
+                  {% for v in row.vals %}
+                  <td class="text-end font-monospace small">
+                    {% if v is not none %}
+                      {{ "%.1f%%"|format(v) if row.fmt == 'pct' else "%.2f"|format(v) }}
+                    {% else %}n/a{% endif %}
+                  </td>
+                  {% endfor %}
+                  <td class="text-center">
+                    <span class="badge badge-{{ 'pass' if row.verdict_cls == 'success' else ('warn' if row.verdict_cls == 'warning' else 'fail') }}">
+                      {{ row.passed }}/{{ row.total }}
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-body py-2">
+              <span class="text-muted small">Revenue trend (newest first):</span>
+              <strong class="ms-2 {{ 'text-success' if consistency.revenue_trend == 'rising' else ('text-danger' if consistency.revenue_trend == 'declining' else '') }}">{{ consistency.revenue_trend }}</strong>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-body py-2">
+              <span class="text-muted small">Retained earnings trend:</span>
+              <strong class="ms-2 {{ 'text-success' if consistency.re_trend == 'rising' else ('text-danger' if consistency.re_trend == 'declining' else '') }}">{{ consistency.re_trend }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="text-muted small mt-3">A metric that clears its threshold every year — especially through a downturn — is far stronger than one that only clears it on average.</p>
+    </div><!-- /tab-consistency -->
 
   </div><!-- /tab-content -->
 </div>

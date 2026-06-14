@@ -90,6 +90,50 @@ def _report(name: str, cur: dict, pri: dict | None = None) -> None:
             console.print(f"  YoY trend: [bold]{delta:+.1f} days[/] — {direction}.")
 
 
+def compute(profile) -> dict:
+    data = profile.ccc_inputs()
+
+    def calc(p):
+        rev, cogs = p["revenue"], p["cogs"]
+        if not rev or not cogs:
+            return None, None, None, None
+        dio = p["inventory"] / cogs * 365
+        dso = p["ar"] / rev * 365
+        dpo = p["ap"] / cogs * 365
+        return dio, dso, dpo, dio + dso - dpo
+
+    dio_c, dso_c, dpo_c, ccc_c = calc(data["current"])
+    dio_p, dso_p, dpo_p, ccc_p = calc(data["prior"])
+
+    if ccc_c is None:
+        interp, interp_cls = "Insufficient data (zero revenue or COGS).", "secondary"
+    elif ccc_c < 0:
+        interp = f"Negative CCC ({ccc_c:.1f} days) — customers pay before suppliers are paid. Structural cash advantage."
+        interp_cls = "success"
+    elif ccc_c < 30:
+        interp, interp_cls = f"Very efficient ({ccc_c:.1f} days) — cash moves through the business quickly.", "success"
+    elif ccc_c < 60:
+        interp, interp_cls = f"Moderate cycle ({ccc_c:.1f} days) — typical for many industries.", "warning"
+    else:
+        interp = f"Long cycle ({ccc_c:.1f} days) — cash is tied up; look for inventory build-up or slow collections."
+        interp_cls = "danger"
+
+    trend = None
+    if ccc_c is not None and ccc_p is not None:
+        delta = ccc_c - ccc_p
+        trend = {"delta": delta, "direction": "improving" if delta < 0 else "worsening"}
+
+    return {
+        "rows": [
+            {"label": "DIO (Days Inventory)",  "formula": "Inventory / COGS x 365", "cur": dio_c, "pri": dio_p},
+            {"label": "DSO (Days Receivable)", "formula": "AR / Revenue x 365",     "cur": dso_c, "pri": dso_p},
+            {"label": "DPO (Days Payable)",    "formula": "AP / COGS x 365",        "cur": dpo_c, "pri": dpo_p},
+            {"label": "CCC (Net cycle)",       "formula": "DIO + DSO - DPO",        "cur": ccc_c, "pri": ccc_p},
+        ],
+        "interp": interp, "interp_cls": interp_cls, "trend": trend,
+    }
+
+
 def run() -> None:
     console.rule("[bold magenta]Module 6 — Cash Conversion Cycle[/]")
     profile = get_profile()
