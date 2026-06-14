@@ -70,6 +70,11 @@ def _run_analysis(request_form) -> dict:
     ]
     name = request_form.get("company_name", "").strip() or "Target Company"
 
+    unit = request_form.get("unit", "millions")
+    unit_factor = {"hundreds": 0.0001, "thousands": 0.001, "millions": 1.0}.get(unit, 1.0)
+    unit_label  = {"hundreds": "$00s (Hundreds)", "thousands": "$000s (Thousands)",
+                   "millions": "$M (Millions)"}.get(unit, "$M (Millions)")
+
     def parse_stmt(prefix: str, items: list[str]) -> dict:
         stmt: dict = {}
         for item_idx, item in enumerate(items):
@@ -79,7 +84,7 @@ def _run_analysis(request_form) -> dict:
                     val = float(request_form.get(f"{prefix}_{item_idx}_{p_idx}") or 0)
                 except ValueError:
                     val = 0.0
-                stmt[item][p_idx] = val
+                stmt[item][p_idx] = val * unit_factor
         return stmt
 
     profile = CompanyProfile(name, periods)
@@ -104,6 +109,7 @@ def _run_analysis(request_form) -> dict:
         buft=buft,
         saas_results=saas_results,
         growth=growth,
+        unit_label=unit_label,
         generated=datetime.now().strftime("%B %d, %Y at %I:%M %p"),
     )
 

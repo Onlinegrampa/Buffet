@@ -72,14 +72,27 @@
   <div class="section-card card mb-3">
     <div class="card-body px-4 py-3">
 
+      <input type="hidden" name="unit" id="unit" value="millions">
+
       <div class="row g-3 align-items-end mb-3">
-        <div class="col-md-5">
+        <div class="col-md-4">
           <label class="form-label fw-semibold small mb-1">Company Name</label>
           <input type="text" name="company_name" class="form-control" placeholder="e.g. Apple Inc." required>
         </div>
-        <div class="col-md-7">
-          <label class="form-label fw-semibold small mb-1">Number of periods to analyze</label>
-          <div class="period-toggle btn-group" role="group">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold small mb-1">Input unit</label>
+          <div class="btn-group w-100" role="group">
+            <button type="button" class="btn btn-outline-secondary unit-btn"
+                    data-unit="hundreds" onclick="setUnit('hundreds')">$00s<br><span style="font-size:.7rem;opacity:.7">Hundreds</span></button>
+            <button type="button" class="btn btn-outline-secondary unit-btn"
+                    data-unit="thousands" onclick="setUnit('thousands')">$000s<br><span style="font-size:.7rem;opacity:.7">Thousands</span></button>
+            <button type="button" class="btn btn-outline-secondary unit-btn active"
+                    data-unit="millions" onclick="setUnit('millions')">$M<br><span style="font-size:.7rem;opacity:.7">Millions</span></button>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold small mb-1">Number of periods</label>
+          <div class="period-toggle btn-group w-100" role="group">
             {% for n in range(2, max_periods + 1) %}
             <button type="button" class="btn btn-outline-primary {{ 'active' if n == 2 else '' }}"
                     data-count="{{ n }}" onclick="setPeriods({{ n }})">{{ n }}</button>
@@ -101,7 +114,7 @@
         </div>
         {% endfor %}
       </div>
-      <p class="hint mt-2 mb-0">All values in $millions. Blank = 0. Enter CapEx and Treasury Stock as positive numbers.</p>
+      <p class="hint mt-2 mb-0" id="unit-hint">All values in $millions ($M). Blank = 0. Enter CapEx and Treasury Stock as positive numbers.</p>
     </div>
   </div>
 
@@ -169,6 +182,20 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+  const UNIT_LABELS = {
+    hundreds: 'All values in $hundreds ($00s). Blank = 0. Enter CapEx and Treasury Stock as positive numbers.',
+    thousands: 'All values in $thousands ($000s). Blank = 0. Enter CapEx and Treasury Stock as positive numbers.',
+    millions:  'All values in $millions ($M). Blank = 0. Enter CapEx and Treasury Stock as positive numbers.',
+  };
+
+  function setUnit(u) {
+    document.getElementById('unit').value = u;
+    document.querySelectorAll('.unit-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.unit === u);
+    });
+    document.getElementById('unit-hint').textContent = UNIT_LABELS[u];
+  }
+
   let activePeriods = 2;
 
   function setPeriods(n) {
