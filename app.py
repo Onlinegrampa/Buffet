@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
+import uuid
+from datetime import datetime
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, Response
 
 from analyzers.buffett import compute as buffett_compute
 from analyzers.saas import compute as saas_compute
@@ -26,6 +28,9 @@ HIGHLIGHT = {
     "Revenue", "Gross Profit", "Operating Income (EBIT)", "Net Income",
     "Operating Cash Flow (OCF)", "Free Cash Flow (FCF)",
 }
+
+# In-memory store for report data (keyed by report_id)
+_report_store: dict = {}
 
 
 @app.template_filter("money")
@@ -56,14 +61,14 @@ def index() -> str:
     )
 
 
-@app.route("/analyze", methods=["POST"])
-def analyze() -> str:
-    n = min(MAX_PERIODS, max(2, int(request.form.get("n_periods") or 2)))
+def _run_analysis(request_form) -> dict:
+    """Parse form and run all analyzers. Returns a dict of template variables."""
+    n = min(MAX_PERIODS, max(2, int(request_form.get("n_periods") or 2)))
     periods = [
-        (request.form.get(f"period_{i}") or DEFAULT_PERIOD_LABELS[i]).strip()
+        (request_form.get(f"period_{i}") or DEFAULT_PERIOD_LABELS[i]).strip()
         for i in range(n)
     ]
-    name = request.form.get("company_name", "").strip() or "Target Company"
+    name = request_form.get("company_name", "").strip() or "Target Company"
 
     def parse_stmt(prefix: str, items: list[str]) -> dict:
         stmt: dict = {}
@@ -71,7 +76,7 @@ def analyze() -> str:
             stmt[item] = {}
             for p_idx in range(n):
                 try:
-                    val = float(request.form.get(f"{prefix}_{item_idx}_{p_idx}") or 0)
+                    val = float(request_form.get(f"{prefix}_{item_idx}_{p_idx}") or 0)
                 except ValueError:
                     val = 0.0
                 stmt[item][p_idx] = val
@@ -92,14 +97,37 @@ def analyze() -> str:
         for label, m in r40["margins"].items()
     }
 
-    return render_template(
-        "results.html",
+    return dict(
         company=name,
         periods=periods,
         stmt=stmt,
         buft=buft,
         saas_results=saas_results,
         growth=growth,
+        generated=datetime.now().strftime("%B %d, %Y at %I:%M %p"),
+    )
+
+
+@app.route("/analyze", methods=["POST"])
+def analyze() -> str:
+    data = _run_analysis(request.form)
+    report_id = str(uuid.uuid4())
+    _report_store[report_id] = data
+    return render_template("results.html", report_id=report_id, **data)
+
+
+@app.route("/download/<report_id>")
+def download(report_id: str) -> Response:
+    data = _report_store.get(report_id)
+    if not data:
+        return Response("Report not found. Please run the analysis again.", status=404)
+    html = render_template("report.html", **data)
+    company_slug = data["company"].replace(" ", "_").replace("/", "-")
+    filename = f"FinSight_{company_slug}_{data['periods'][0]}.html"
+    return Response(
+        html,
+        mimetype="text/html",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FinSight Report — {{ company }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+         font-size: 13px; color: #1a1a1a; background: #fff; padding: 32px 40px; }
+
+  /* Cover */
+  .cover { border-bottom: 3px solid #1a3a5c; padding-bottom: 24px; margin-bottom: 28px; }
+  .cover h1 { font-size: 26px; color: #0f1b2d; font-weight: 700; }
+  .cover .sub { font-size: 14px; color: #555; margin-top: 4px; }
+  .cover .meta { font-size: 12px; color: #888; margin-top: 8px; }
+  .brand { font-size: 13px; font-weight: 700; color: #1a3a5c; letter-spacing: .06em;
+           text-transform: uppercase; margin-bottom: 6px; }
+
+  /* Sections */
+  h2 { font-size: 15px; font-weight: 700; color: #0f1b2d; border-bottom: 2px solid #e0e7ef;
+       padding-bottom: 6px; margin: 28px 0 12px; }
+  h3 { font-size: 13px; font-weight: 600; color: #1a3a5c; margin: 18px 0 8px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
+  th { background: #f0f4f8; color: #555; font-size: 11px; text-transform: uppercase;
+       letter-spacing: .04em; padding: 6px 10px; text-align: left; }
+  th.r, td.r { text-align: right; }
+  td { padding: 5px 10px; border-bottom: 1px solid #f0f0f0; }
+  tr:last-child td { border-bottom: none; }
+  tr.hl td { background: #f5f8fc; font-weight: 600; }
+
+  .pos { color: #1a7a4a; }
+  .neg { color: #c0392b; }
+  .neu { color: #888; }
+
+  /* Buffett score */
+  .score-block { display: inline-flex; flex-direction: column; align-items: center;
+                 border: 4px solid; border-radius: 50%; width: 90px; height: 90px;
+                 justify-content: center; margin-bottom: 12px; }
+  .score-block .num { font-size: 28px; font-weight: 700; line-height: 1; }
+  .score-block .den { font-size: 11px; color: #888; }
+  .good { border-color: #1a7a4a; color: #1a7a4a; }
+  .warn { border-color: #c97d00; color: #c97d00; }
+  .bad  { border-color: #c0392b; color: #c0392b; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px;
+           font-size: 11px; font-weight: 600; }
+  .badge-pass { background: #d1e7dd; color: #0a3622; }
+  .badge-warn { background: #fff3cd; color: #664d03; }
+  .badge-fail { background: #f8d7da; color: #58151c; }
+  .badge-ok   { background: #d1e7dd; color: #0a3622; }
+  .badge-err  { background: #f8d7da; color: #58151c; }
+
+  /* Rule of 40 */
+  .r40-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
+  .r40-card { padding: 14px 16px; border-radius: 8px; }
+  .r40-pass { background: #d1e7dd; }
+  .r40-fail { background: #f8d7da; }
+  .r40-card .score { font-size: 28px; font-weight: 700; }
+  .r40-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+                     color: #555; margin-bottom: 4px; }
+  .r40-card .verdict { font-size: 11px; font-weight: 700; margin-top: 4px; }
+  .r40-card .row-line { display: flex; justify-content: space-between; font-size: 11px;
+                         color: #444; margin-top: 6px; }
+
+  /* Integrity */
+  .check { font-size: 12px; margin-bottom: 4px; }
+  .check.ok  { color: #1a7a4a; }
+  .check.err { color: #c0392b; }
+
+  /* Period badge */
+  .pbadge { background: #e8f0fe; color: #1a3a5c; padding: 2px 6px; border-radius: 4px;
+            font-size: 11px; font-weight: 600; white-space: nowrap; }
+
+  /* Footer */
+  .footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid #ddd;
+            font-size: 11px; color: #aaa; }
+
+  @media print {
+    body { padding: 16px; }
+    h2 { page-break-before: auto; }
+    table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Cover -->
+<div class="cover">
+  <div class="brand">FinSight — Financial Analysis Suite</div>
+  <h1>{{ company }}</h1>
+  <div class="sub">Periods analyzed: {{ periods | join(" &nbsp;/&nbsp; ") }}</div>
+  <div class="meta">Generated {{ generated }}</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 1: BUFFETT MOAT SCANNER
+════════════════════════════════════════════════════ -->
+<h2>1. Buffett Moat Scanner</h2>
+
+<div style="display:flex;align-items:center;gap:24px;margin-bottom:16px;">
+  <div class="score-block {{ buft.verdict_level }}">
+    <span class="num">{{ buft.passes }}</span>
+    <span class="den">/ 14</span>
+  </div>
+  <div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:4px;">
+      {{ "%.0f"|format(buft.score_pct) }}% rules passed
+    </div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:6px;">{{ buft.verdict }}</div>
+    <div style="font-size:12px;color:#555;">
+      <span style="color:#1a7a4a;font-weight:600;">{{ buft.passes }} pass</span> &nbsp;
+      <span style="color:#c97d00;font-weight:600;">{{ buft.warns }} warn</span> &nbsp;
+      <span style="color:#c0392b;font-weight:600;">{{ buft.fails }} fail</span>
+      {% if buft.roe is not none %}
+      &nbsp;&nbsp;|&nbsp;&nbsp; ROE: <strong>{{ "%.1f"|format(buft.roe) }}%</strong>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Rule</th>
+      <th>Formula</th>
+      <th class="r">Value</th>
+      <th>Threshold</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for rule in buft.rules %}
+    <tr>
+      <td>{{ rule.name }}</td>
+      <td style="color:#666;font-size:11px;">{{ rule.formula }}</td>
+      <td class="r" style="font-family:monospace;">{{ rule.value }}</td>
+      <td style="font-size:11px;">{{ rule.threshold }}</td>
+      <td>
+        <span class="badge badge-{{ rule.status | lower }}">{{ rule.status }}</span>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 2: RULE OF 40
+════════════════════════════════════════════════════ -->
+<h2>2. Rule of 40 Dashboard</h2>
+<p style="font-size:12px;color:#555;margin-bottom:12px;">
+  Revenue growth: <strong>{{ "%+.1f"|format(growth) }}% YoY</strong>
+  &nbsp;&nbsp;Rule of 40 = Revenue Growth % + Profitability %
+</p>
+
+<div class="r40-grid">
+  {% for label, r in saas_results.items() %}
+  <div class="r40-card {{ 'r40-pass' if r.passes else 'r40-fail' }}">
+    <div class="label">{{ label }}</div>
+    <div class="score">{{ "%+.0f"|format(r.score) }}</div>
+    <div class="verdict">{{ 'HEALTHY / PASS' if r.passes else 'HIGH RISK / FAIL' }}</div>
+    <div class="row-line"><span>Growth</span><span>{{ "%+.1f"|format(r.growth) }}%</span></div>
+    <div class="row-line"><span>Margin</span><span>{{ "%+.1f"|format(r.margin) }}%</span></div>
+    <div style="font-size:10px;color:#555;margin-top:6px;">{{ r.insight }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 3: 3-STATEMENT ANALYSIS
+════════════════════════════════════════════════════ -->
+<h2>3. Three-Statement Analysis</h2>
+
+{% macro stmt_table(title, rows) %}
+<h3>{{ title }}</h3>
+<table>
+  <thead>
+    <tr>
+      <th style="min-width:200px;">Line Item</th>
+      {% for p in periods %}<th class="r"><span class="pbadge">{{ p }}</span></th>{% endfor %}
+      <th class="r">$ Chg</th>
+      <th class="r">% Chg</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr class="{{ 'hl' if row.item in ['Total Assets','Total Liabilities','Total Shareholders\' Equity','Revenue','Gross Profit','Operating Income (EBIT)','Net Income','Operating Cash Flow (OCF)','Free Cash Flow (FCF)'] else '' }}">
+      <td>{{ row.item }}</td>
+      {% for v in row.vals %}
+      <td class="r" style="font-family:monospace;">{{ v | money }}</td>
+      {% endfor %}
+      <td class="r {{ 'pos' if row.change > 0 else ('neg' if row.change < 0 else 'neu') }}"
+          style="font-family:monospace;">{{ row.change | money }}</td>
+      <td class="r {{ 'pos' if (row.pct is not none and row.pct > 0) else ('neg' if (row.pct is not none and row.pct < 0) else 'neu') }}"
+          style="font-family:monospace;">{{ row.pct | pct }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+{{ stmt_table("Balance Sheet", stmt.balance_sheet) }}
+{{ stmt_table("Income Statement", stmt.income_statement) }}
+{{ stmt_table("Cash Flow Statement", stmt.cash_flow) }}
+
+<!-- Integrity checks -->
+<h3>Integrity Checks</h3>
+<p style="font-size:11px;color:#666;margin-bottom:6px;">Assets = Liabilities + Equity</p>
+{% for c in stmt.bs_checks %}
+<div class="check {{ 'ok' if c.ok else 'err' }}">
+  {% if c.ok %}
+  [OK] {{ c.period }}: Assets {{ c.assets | money }} = L+E {{ c.rhs | money }}
+  {% else %}
+  [!!] {{ c.period }} OUT OF BALANCE: Assets {{ c.assets | money }} vs L+E {{ c.rhs | money }} (off by {{ c.diff | money }})
+  {% endif %}
+</div>
+{% endfor %}
+
+<p style="font-size:11px;color:#666;margin:10px 0 6px;">FCF = OCF - CapEx</p>
+{% for c in stmt.fcf_checks %}
+<div class="check {{ 'ok' if c.ok else 'err' }}">
+  {% if c.ok %}
+  [OK] {{ c.period }}: OCF {{ c.ocf | money }} - CapEx {{ c.capex | money }} = {{ c.computed | money }}
+  {% else %}
+  [!!] {{ c.period }} FCF mismatch: computed {{ c.computed | money }} vs reported {{ c.reported | money }}
+  {% endif %}
+</div>
+{% endfor %}
+
+<!-- Footer -->
+<div class="footer">
+  FinSight Financial Analysis Suite &nbsp;|&nbsp; {{ company }} &nbsp;|&nbsp; {{ generated }}
+  &nbsp;|&nbsp; All values in $millions. For informational purposes only.
+</div>
+
+</body>
+</html>

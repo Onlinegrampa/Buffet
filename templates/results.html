@@ -70,7 +70,11 @@
       <span class="fw-semibold">{{ company }}</span>
       <span class="ms-2 opacity-60 small">{{ periods | join(" / ") }}</span>
     </div>
-    <a href="/">&#8592; New Analysis</a>
+    <div class="d-flex gap-2 align-items-center">
+      <a href="/download/{{ report_id }}"
+         class="btn btn-sm btn-outline-light px-3">&#11123; Download Report</a>
+      <a href="/" class="opacity-75" style="color:rgba(255,255,255,.7);text-decoration:none;font-size:.9rem;">&#8592; New Analysis</a>
+    </div>
   </div>
 </div>
 
