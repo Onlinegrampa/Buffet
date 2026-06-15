@@ -7,3 +7,4 @@ instance/
 *.egg-info/
 dist/
 build/
+saved_reports/

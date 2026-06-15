@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saved Reports — FinSight</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f0f2f5; }
+    .topbar {
+      background: linear-gradient(135deg, #0f1b2d 0%, #1a3a5c 100%);
+      color: white; padding: 14px 0;
+      position: sticky; top: 0; z-index: 1000;
+    }
+    .topbar a { color: rgba(255,255,255,.7); text-decoration: none; font-size: .9rem; }
+    .topbar a:hover { color: white; }
+    .card { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+    .report-row { border-bottom: 1px solid #f0f0f0; }
+    .report-row:last-child { border-bottom: none; }
+    .company-name { font-weight: 600; font-size: .95rem; }
+    .period-badge {
+      background: #e8f0fe; color: #1a3a5c;
+      padding: 2px 8px; border-radius: 5px;
+      font-size: .72rem; font-weight: 600; white-space: nowrap;
+    }
+    .meta-txt { font-size: .78rem; color: #888; }
+    .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="container d-flex justify-content-between align-items-center">
+    <span class="fw-bold fs-5">FinSight <span class="opacity-60 fw-light fs-6">— Saved Reports</span></span>
+    <a href="/">&#8592; New Analysis</a>
+  </div>
+</div>
+
+<div class="container my-4" style="max-width:860px;">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold mb-0">Saved Reports <span class="badge bg-secondary ms-1" style="font-size:.75rem;">{{ reports|length }}</span></h5>
+  </div>
+
+  <div class="card">
+    {% if reports %}
+    <div class="card-body p-0">
+      {% for r in reports %}
+      <div class="report-row px-4 py-3 d-flex align-items-center gap-3">
+
+        <!-- Icon -->
+        <div style="font-size:1.6rem;width:36px;text-align:center;flex-shrink:0;">&#128196;</div>
+
+        <!-- Info -->
+        <div class="flex-grow-1">
+          <div class="company-name">{{ r.company }}</div>
+          <div class="d-flex flex-wrap gap-1 mt-1">
+            {% for p in r.periods %}
+            <span class="period-badge">{{ p }}</span>
+            {% endfor %}
+          </div>
+          <div class="meta-txt mt-1">{{ r.unit_label }} &nbsp;|&nbsp; {{ r.generated }}</div>
+        </div>
+
+        <!-- Actions -->
+        <div class="d-flex gap-2 flex-shrink-0">
+          <a href="/download/{{ r.report_id }}"
+             class="btn btn-sm btn-outline-primary px-3">
+            &#11123; Download
+          </a>
+          <form action="/reports/{{ r.report_id }}/delete" method="post"
+                onsubmit="return confirm('Delete the report for {{ r.company }} ({{ r.periods|join(', ') }})? This cannot be undone.');">
+            <button type="submit" class="btn btn-sm btn-outline-danger px-3">
+              &#128465; Delete
+            </button>
+          </form>
+        </div>
+
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="icon">&#128202;</div>
+      <div class="fw-semibold mb-1">No saved reports yet</div>
+      <div class="text-muted small">Run an analysis and reports will appear here automatically.</div>
+      <a href="/" class="btn btn-primary mt-3 px-4">Start Analysis</a>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
