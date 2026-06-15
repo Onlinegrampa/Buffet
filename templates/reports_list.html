@@ -6,26 +6,54 @@
   <title>Saved Reports — FinSight</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body { background: #f0f2f5; }
+    body { background: #f0f2f5; font-size: .875rem; }
     .topbar {
       background: linear-gradient(135deg, #0f1b2d 0%, #1a3a5c 100%);
       color: white; padding: 14px 0;
       position: sticky; top: 0; z-index: 1000;
     }
-    .topbar a { color: rgba(255,255,255,.7); text-decoration: none; font-size: .9rem; }
+    .topbar a { color: rgba(255,255,255,.75); text-decoration: none; font-size: .88rem; }
     .topbar a:hover { color: white; }
-    .card { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
-    .report-row { border-bottom: 1px solid #f0f0f0; }
-    .report-row:last-child { border-bottom: none; }
-    .company-name { font-weight: 600; font-size: .95rem; }
-    .period-badge {
-      background: #e8f0fe; color: #1a3a5c;
-      padding: 2px 8px; border-radius: 5px;
-      font-size: .72rem; font-weight: 600; white-space: nowrap;
+
+    .dash-card { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+
+    /* Sortable table */
+    .dash-table { font-size: .8rem; }
+    .dash-table th {
+      background: #f0f4f8; color: #555;
+      font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+      white-space: nowrap; cursor: pointer; user-select: none;
+      padding: 9px 10px; border-bottom: 2px solid #dee2e6;
     }
-    .meta-txt { font-size: .78rem; color: #888; }
-    .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
-    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .dash-table th:hover { background: #e3eaf3; color: #1a3a5c; }
+    .dash-table th.sort-asc::after  { content: " \25B2"; font-size:.65rem; }
+    .dash-table th.sort-desc::after { content: " \25BC"; font-size:.65rem; }
+    .dash-table td { padding: 8px 10px; vertical-align: middle; white-space: nowrap; }
+    .dash-table tbody tr:hover { background: #f8fafc; }
+
+    /* Chips */
+    .chip { display:inline-block; padding:2px 7px; border-radius:4px; font-size:.72rem; font-weight:600; }
+    .chip-green  { background:#d1e7dd; color:#0a3622; }
+    .chip-yellow { background:#fff3cd; color:#664d03; }
+    .chip-red    { background:#f8d7da; color:#58151c; }
+    .chip-blue   { background:#cfe2ff; color:#084298; }
+    .chip-gray   { background:#e9ecef; color:#555; }
+
+    .period-badge { background:#e8f0fe; color:#1a3a5c; padding:2px 6px; border-radius:4px; font-size:.7rem; font-weight:600; }
+
+    .company-cell { font-weight:600; max-width:160px; overflow:hidden; text-overflow:ellipsis; }
+
+    /* num cells right-aligned */
+    .n { text-align: right; font-family: monospace; }
+
+    /* empty */
+    .empty-state { text-align:center; padding:60px 20px; color:#aaa; }
+
+    /* search */
+    #search-box { font-size:.82rem; max-width:260px; }
+
+    /* tooltip helper */
+    [title] { cursor: help; }
   </style>
 </head>
 <body>
@@ -37,61 +65,273 @@
   </div>
 </div>
 
-<div class="container my-4" style="max-width:860px;">
+<div class="container-fluid my-4 px-4">
 
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h5 class="fw-bold mb-0">Saved Reports <span class="badge bg-secondary ms-1" style="font-size:.75rem;">{{ reports|length }}</span></h5>
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h5 class="fw-bold mb-0">
+      Company Dashboard
+      <span class="badge bg-secondary ms-1" style="font-size:.72rem;" id="count-badge">{{ reports|length }}</span>
+    </h5>
+    {% if reports %}
+    <input type="text" id="search-box" class="form-control form-control-sm"
+           placeholder="&#128269; Filter companies..." oninput="filterTable()">
+    {% endif %}
   </div>
 
-  <div class="card">
+  <div class="dash-card card">
     {% if reports %}
     <div class="card-body p-0">
-      {% for r in reports %}
-      <div class="report-row px-4 py-3 d-flex align-items-center gap-3">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 dash-table" id="dash-table">
+          <thead>
+            <tr>
+              <th data-col="0" data-type="str"  onclick="sortTable(this)">Company</th>
+              <th data-col="1" data-type="str"  onclick="sortTable(this)">Period</th>
+              <th data-col="2" data-type="num"  onclick="sortTable(this)" title="Buffett rules passed out of 14">Buffett</th>
+              <th data-col="3" data-type="num"  onclick="sortTable(this)" title="Revenue growth % YoY">Rev Growth</th>
+              <th data-col="4" data-type="num"  onclick="sortTable(this)" title="Rule of 40 using FCF Margin">Rule of 40</th>
+              <th data-col="5" data-type="num"  onclick="sortTable(this)" title="Gross margin %">Gross Mgn</th>
+              <th data-col="6" data-type="num"  onclick="sortTable(this)" title="Operating margin %">Op Mgn</th>
+              <th data-col="7" data-type="num"  onclick="sortTable(this)" title="Net margin %">Net Mgn</th>
+              <th data-col="8" data-type="num"  onclick="sortTable(this)" title="Cash conversion cycle in days">CCC (days)</th>
+              <th data-col="9" data-type="str"  onclick="sortTable(this)" title="Business stage classification">Stage</th>
+              <th data-col="10" data-type="str" onclick="sortTable(this)" title="Cash runway verdict">Runway</th>
+              <th data-col="11" data-type="num" onclick="sortTable(this)" title="Income statement flags raised (out of 4)">IS Flags</th>
+              <th data-col="12" data-type="str" onclick="sortTable(this)">Saved</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            {% for r in reports %}
+            {% set m = r.metrics %}
+            <tr data-id="{{ r.report_id }}">
 
-        <!-- Icon -->
-        <div style="font-size:1.6rem;width:36px;text-align:center;flex-shrink:0;">&#128196;</div>
+              <!-- 0: Company -->
+              <td class="company-cell" title="{{ r.company }}">{{ r.company }}</td>
 
-        <!-- Info -->
-        <div class="flex-grow-1">
-          <div class="company-name">{{ r.company }}</div>
-          <div class="d-flex flex-wrap gap-1 mt-1">
-            {% for p in r.periods %}
-            <span class="period-badge">{{ p }}</span>
+              <!-- 1: Period -->
+              <td>
+                {% for p in r.periods[:3] %}
+                <span class="period-badge">{{ p }}</span>{% if not loop.last %} {% endif %}
+                {% endfor %}
+                {% if r.periods|length > 3 %}<span class="text-muted" style="font-size:.7rem;">+{{ r.periods|length - 3 }}</span>{% endif %}
+              </td>
+
+              <!-- 2: Buffett -->
+              <td class="n">
+                {% if m.buffett_passes is not none %}
+                <span class="chip chip-{{ 'green' if m.buffett_level == 'good' else ('yellow' if m.buffett_level == 'warn' else 'red') }}">
+                  {{ m.buffett_passes }}/14
+                </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+
+              <!-- 3: Rev Growth -->
+              <td class="n">
+                {% if m.revenue_growth is not none %}
+                <span class="chip chip-{{ 'green' if m.revenue_growth >= 25 else ('yellow' if m.revenue_growth >= 10 else 'red') }}">
+                  {{ "%+.1f%%"|format(m.revenue_growth) }}
+                </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+
+              <!-- 4: Rule of 40 (FCF) -->
+              <td class="n">
+                {% if m.r40_fcf_score is not none %}
+                <span class="chip chip-{{ 'green' if m.r40_fcf_passes else 'red' }}">
+                  {{ "%+.0f"|format(m.r40_fcf_score) }}
+                </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+
+              <!-- 5: Gross Margin -->
+              <td class="n">
+                {% if m.gross_margin is not none %}
+                <span class="chip chip-{{ 'green' if m.gross_margin >= 40 else ('yellow' if m.gross_margin >= 20 else 'red') }}">
+                  {{ "%.1f%%"|format(m.gross_margin) }}
+                </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+
+              <!-- 6: Op Margin -->
+              <td class="n">
+                {% if m.operating_margin is not none %}
+                <span class="chip chip-{{ 'green' if m.operating_margin > 0 else 'red' }}">
+                  {{ "%.1f%%"|format(m.operating_margin) }}
+                </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+
+              <!-- 7: Net Margin -->
+              <td class="n">
+                {% if m.net_margin is not none %}
+                <span class="chip chip-{{ 'green' if m.net_margin >= 20 else ('yellow' if m.net_margin > 0 else 'red') }}">
+                  {{ "%.1f%%"|format(m.net_margin) }}
+                </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+
+              <!-- 8: CCC -->
+              <td class="n">
+                {% if m.ccc_days is not none %}
+                <span class="chip chip-{{ 'green' if m.ccc_days < 30 else ('yellow' if m.ccc_days < 60 else 'red') }}">
+                  {{ "%.0f"|format(m.ccc_days) }}d
+                </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+
+              <!-- 9: Stage -->
+              <td>
+                {% if m.stage_num is not none %}
+                <span class="chip chip-blue" title="{{ m.stage_label }}">S{{ m.stage_num }} {{ m.stage_label }}</span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+
+              <!-- 10: Runway -->
+              <td>
+                {% if m.positive_fcf %}
+                  <span class="chip chip-green">FCF+</span>
+                {% elif m.runway_label %}
+                  <span class="chip chip-{{ 'green' if m.runway_label == 'SAFE' else ('yellow' if m.runway_label in ('WATCH','DANGER') else 'red') }}">
+                    {{ m.runway_label }}
+                    {% if m.runway_years is not none %} {{ "%.1f"|format(m.runway_years) }}yr{% endif %}
+                  </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+
+              <!-- 11: IS Flags -->
+              <td class="n">
+                {% if m.flags_raised is not none %}
+                <span class="chip chip-{{ 'green' if m.flags_raised == 0 else ('yellow' if m.flags_raised == 1 else 'red') }}">
+                  {{ m.flags_raised }}/4
+                </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+
+              <!-- 12: Saved -->
+              <td class="text-muted" style="font-size:.72rem;">{{ r.generated }}</td>
+
+              <!-- Actions -->
+              <td>
+                <div class="d-flex gap-1">
+                  <a href="/download/{{ r.report_id }}"
+                     class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:.75rem;">
+                    &#11123; Download
+                  </a>
+                  <form action="/reports/{{ r.report_id }}/delete" method="post"
+                        onsubmit="return confirm('Delete report for {{ r.company }}? This cannot be undone.');">
+                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:.75rem;">
+                      &#128465;
+                    </button>
+                  </form>
+                </div>
+              </td>
+
+            </tr>
             {% endfor %}
-          </div>
-          <div class="meta-txt mt-1">{{ r.unit_label }} &nbsp;|&nbsp; {{ r.generated }}</div>
-        </div>
-
-        <!-- Actions -->
-        <div class="d-flex gap-2 flex-shrink-0">
-          <a href="/download/{{ r.report_id }}"
-             class="btn btn-sm btn-outline-primary px-3">
-            &#11123; Download
-          </a>
-          <form action="/reports/{{ r.report_id }}/delete" method="post"
-                onsubmit="return confirm('Delete the report for {{ r.company }} ({{ r.periods|join(', ') }})? This cannot be undone.');">
-            <button type="submit" class="btn btn-sm btn-outline-danger px-3">
-              &#128465; Delete
-            </button>
-          </form>
-        </div>
-
+          </tbody>
+        </table>
       </div>
-      {% endfor %}
     </div>
+
     {% else %}
     <div class="empty-state">
-      <div class="icon">&#128202;</div>
+      <div style="font-size:3rem;margin-bottom:12px;">&#128202;</div>
       <div class="fw-semibold mb-1">No saved reports yet</div>
-      <div class="text-muted small">Run an analysis and reports will appear here automatically.</div>
+      <div class="text-muted small">Run an analysis and it will appear here automatically.</div>
       <a href="/" class="btn btn-primary mt-3 px-4">Start Analysis</a>
     </div>
     {% endif %}
   </div>
 
-</div>
+  {% if reports %}
+  <p class="text-muted mt-2" style="font-size:.72rem;">
+    Click any column header to sort. Color chips: <span style="background:#d1e7dd;padding:1px 5px;border-radius:3px;font-size:.72rem;">green = strong</span>
+    <span style="background:#fff3cd;padding:1px 5px;border-radius:3px;font-size:.72rem;">yellow = watch</span>
+    <span style="background:#f8d7da;padding:1px 5px;border-radius:3px;font-size:.72rem;">red = weak</span>
+    &nbsp;|&nbsp; Hover column headers for descriptions.
+  </p>
+  {% endif %}
+
+</div><!-- /container -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  let sortCol = -1, sortAsc = true;
+
+  function cellValue(row, col) {
+    const td = row.querySelectorAll('td')[col];
+    if (!td) return '';
+    // For chips, grab inner text; strip whitespace
+    return td.innerText.trim().replace(/\s+/g, ' ');
+  }
+
+  function parseNum(str) {
+    // Extract first numeric value from string (handles "+12.3%", "5/14", "38d" etc.)
+    const m = str.match(/-?[\d.]+/);
+    return m ? parseFloat(m[0]) : null;
+  }
+
+  function sortTable(th) {
+    const col     = parseInt(th.dataset.col);
+    const type    = th.dataset.type;
+    const tbody   = document.getElementById('table-body');
+    const rows    = Array.from(tbody.querySelectorAll('tr'));
+
+    // Toggle direction if same column
+    if (sortCol === col) {
+      sortAsc = !sortAsc;
+    } else {
+      sortCol = col;
+      sortAsc = true;
+    }
+
+    rows.sort((a, b) => {
+      let va = cellValue(a, col);
+      let vb = cellValue(b, col);
+      const blank = v => v === '' || v === '—' || v === 'n/a';
+
+      // Always push blanks to bottom
+      if (blank(va) && blank(vb)) return 0;
+      if (blank(va)) return 1;
+      if (blank(vb)) return -1;
+
+      if (type === 'num') {
+        const na = parseNum(va), nb = parseNum(vb);
+        if (na !== null && nb !== null) return sortAsc ? na - nb : nb - na;
+      }
+      // String / fallback
+      return sortAsc
+        ? va.localeCompare(vb, undefined, {sensitivity: 'base'})
+        : vb.localeCompare(va, undefined, {sensitivity: 'base'});
+    });
+
+    // Re-attach sorted rows
+    rows.forEach(r => tbody.appendChild(r));
+
+    // Update header arrows
+    document.querySelectorAll('.dash-table th').forEach(h => {
+      h.classList.remove('sort-asc', 'sort-desc');
+    });
+    th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+
+    updateCount();
+  }
+
+  function filterTable() {
+    const q = document.getElementById('search-box').value.toLowerCase();
+    const rows = document.querySelectorAll('#table-body tr');
+    rows.forEach(r => {
+      r.style.display = r.innerText.toLowerCase().includes(q) ? '' : 'none';
+    });
+    updateCount();
+  }
+
+  function updateCount() {
+    const visible = Array.from(document.querySelectorAll('#table-body tr'))
+                         .filter(r => r.style.display !== 'none').length;
+    document.getElementById('count-badge').textContent = visible;
+  }
+</script>
 </body>
 </html>

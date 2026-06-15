@@ -64,14 +64,60 @@ def pct_filter(v: float | None) -> str:
 
 # ── Disk helpers ──────────────────────────────────────────────────────────────
 
+def _extract_metrics(data: dict) -> dict:
+    """Pull key financial metrics out of analysis data for dashboard display."""
+    buft        = data.get("buft", {})
+    saas        = data.get("saas_results", {})
+    stage       = data.get("stage", {})
+    survival    = data.get("survival", {})
+    income_scan = data.get("income_scan", {})
+    ccc_data    = data.get("ccc", {})
+    bhealth     = data.get("bhealth", {})
+    leverage    = data.get("leverage", {})
+
+    r40_fcf  = saas.get("Free Cash Flow Margin", {})
+    r40_op   = saas.get("GAAP Operating Margin", {})
+
+    margins  = {r["label"]: r["cur"] for r in income_scan.get("margins", [])}
+    ccc_rows = ccc_data.get("rows", [])
+    ccc_days = ccc_rows[-1]["cur"] if ccc_rows else None
+
+    lev_rows = leverage.get("rows", [])
+    fixed_cost_layer = next((r["cur"] for r in lev_rows if "spread" in r.get("label","").lower()), None)
+
+    ratios   = {r["label"]: r["cur"] for r in bhealth.get("ratios", [])}
+
+    return {
+        "buffett_passes":   buft.get("passes"),
+        "buffett_level":    buft.get("verdict_level"),
+        "revenue_growth":   data.get("growth"),
+        "r40_fcf_score":    r40_fcf.get("score"),
+        "r40_fcf_passes":   r40_fcf.get("passes"),
+        "r40_op_score":     r40_op.get("score"),
+        "stage_num":        stage.get("stage"),
+        "stage_label":      stage.get("label"),
+        "runway_label":     survival.get("verdict_label"),
+        "runway_years":     survival.get("runway"),
+        "positive_fcf":     survival.get("positive_fcf"),
+        "gross_margin":     margins.get("Gross Margin"),
+        "operating_margin": margins.get("Operating Margin"),
+        "net_margin":       margins.get("Net Margin"),
+        "ccc_days":         ccc_days,
+        "fixed_cost_layer": fixed_cost_layer,
+        "current_ratio":    ratios.get("Current Ratio"),
+        "flags_raised":     income_scan.get("flags_raised"),
+    }
+
+
 def _save_report(report_id: str, data: dict, html: str) -> None:
     """Persist report HTML and metadata to disk."""
     meta = {
-        "report_id": report_id,
-        "company":   data["company"],
-        "periods":   data["periods"],
+        "report_id":  report_id,
+        "company":    data["company"],
+        "periods":    data["periods"],
         "unit_label": data["unit_label"],
-        "generated": data["generated"],
+        "generated":  data["generated"],
+        "metrics":    _extract_metrics(data),
     }
     (REPORTS_DIR / f"{report_id}.json").write_text(
         json.dumps(meta, indent=2), encoding="utf-8"
