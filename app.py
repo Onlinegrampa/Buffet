@@ -25,6 +25,7 @@ from analyzers.statements import (
 )
 from analyzers.survival import compute as survival_compute
 from utils.edgar import build_statements as edgar_build, get_filings as edgar_filings, search_companies
+from utils.yahoo import build_statements as yahoo_build, search_tickers
 from utils.profile import CompanyProfile
 
 app = Flask(__name__)
@@ -347,6 +348,77 @@ def edgar_analyze():
         stage=stage, survival=survival, ccc=ccc, leverage=leverage,
         bhealth=bhealth, income_scan=income_scan, consistency=consistency,
         unit_label="$M (Millions — from SEC EDGAR)",
+        generated=datetime.now().strftime("%B %d, %Y at %I:%M %p"),
+    )
+
+    report_id = str(uuid.uuid4())
+    _report_store[report_id] = data
+    html = render_template("report.html", **data)
+    _save_report(report_id, data, html)
+
+    return render_template("results.html", report_id=report_id, **data)
+
+
+# ── Yahoo Finance routes ──────────────────────────────────────────────────────
+
+@app.route("/yahoo/search")
+def yahoo_search():
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([])
+    try:
+        return jsonify(search_tickers(q))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/yahoo/analyze", methods=["POST"])
+def yahoo_analyze():
+    ticker_sym  = request.form.get("ticker", "").strip().upper()
+    period_type = request.form.get("period_type", "annual")
+    try:
+        n_periods = min(MAX_PERIODS, max(1, int(request.form.get("n_periods", 4))))
+    except ValueError:
+        n_periods = 4
+
+    if not ticker_sym:
+        return render_template("edgar.html", active_tab="yahoo",
+                               error="Please enter a ticker symbol."), 400
+
+    try:
+        company_name, period_labels, bs, inc, cf = yahoo_build(ticker_sym, period_type, n_periods)
+    except Exception as exc:
+        return render_template("edgar.html", active_tab="yahoo",
+                               error=f"Yahoo Finance error: {exc}"), 502
+
+    profile = CompanyProfile(company_name, period_labels)
+    profile.balance_sheet    = bs
+    profile.income_statement = inc
+    profile.cash_flow        = cf
+
+    stmt        = stmt_compute(profile)
+    buft        = buffett_compute(profile.name, profile.buffett_inputs())
+    r40         = profile.rule_of_40_inputs()
+    growth      = r40["growth"] if r40["growth"] is not None else 0.0
+    saas_results = {
+        label: saas_compute(profile.name, growth, (m if m is not None else 0.0), label)
+        for label, m in r40["margins"].items()
+    }
+    stage       = stage_compute(profile)
+    survival    = survival_compute(profile)
+    ccc         = ccc_compute(profile)
+    leverage    = leverage_compute(profile)
+    bhealth     = balance_health_compute(profile)
+    income_scan = income_scan_compute(profile)
+    consistency = consistency_compute(profile)
+
+    src = "Annual" if period_type == "annual" else "Quarterly"
+    data = dict(
+        company=company_name, periods=period_labels, stmt=stmt, buft=buft,
+        saas_results=saas_results, growth=growth,
+        stage=stage, survival=survival, ccc=ccc, leverage=leverage,
+        bhealth=bhealth, income_scan=income_scan, consistency=consistency,
+        unit_label=f"$M (Millions — Yahoo Finance {src})",
         generated=datetime.now().strftime("%B %d, %Y at %I:%M %p"),
     )
 
