@@ -228,6 +228,247 @@
 </div>
 {% endfor %}
 
+<!-- ═══════════════════════════════════════════════════
+     SECTION 4: BUSINESS STAGE CLASSIFIER
+════════════════════════════════════════════════════ -->
+<h2>4. Business Stage Classifier</h2>
+<div style="display:flex;align-items:flex-start;gap:24px;margin-bottom:12px;">
+  <div style="text-align:center;min-width:80px;">
+    <div style="font-size:36px;font-weight:700;color:#1a3a5c;line-height:1;">{{ stage.stage }}</div>
+    <div style="font-size:10px;text-transform:uppercase;color:#888;letter-spacing:.05em;">of 6 stages</div>
+  </div>
+  <div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Stage {{ stage.stage }} — {{ stage.label }}</div>
+    <div style="font-size:12px;color:#555;margin-bottom:8px;"><strong>Recommended next:</strong> {{ stage.recommended }}</div>
+    {% for s in stage.signals %}
+    <div style="font-size:12px;margin-bottom:3px;">&#9654; {{ s }}</div>
+    {% endfor %}
+  </div>
+</div>
+<p style="font-size:11px;color:#888;">Stage detection is a heuristic — confirm it against the business narrative before relying on it.</p>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 5: SURVIVAL ANALYSIS
+════════════════════════════════════════════════════ -->
+<h2>5. Survival Analysis</h2>
+<div style="display:flex;gap:32px;align-items:flex-start;margin-bottom:12px;">
+  <div style="text-align:center;">
+    <div style="font-size:28px;font-weight:700;color:{% if survival.verdict_cls == 'success' %}#1a7a4a{% elif survival.verdict_cls == 'danger' %}#c0392b{% else %}#c97d00{% endif %};">
+      {% if survival.positive_fcf %}FCF+{% elif survival.runway is none %}--{% else %}{{ "%.1f"|format(survival.runway) }} yr{% endif %}
+    </div>
+    <div class="badge badge-{{ 'pass' if survival.verdict_cls == 'success' else ('fail' if survival.verdict_cls == 'danger' else 'warn') }}">{{ survival.verdict_label }}</div>
+  </div>
+  <div style="flex:1;">
+    <table style="margin-bottom:8px;">
+      <tr><td style="color:#666;padding:3px 12px 3px 0;">Cash Position</td><td style="font-family:monospace;font-weight:600;">{{ survival.cash | money }}</td></tr>
+      <tr><td style="color:#666;padding:3px 12px 3px 0;">Free Cash Flow</td><td style="font-family:monospace;font-weight:600;color:{% if survival.fcf >= 0 %}#1a7a4a{% else %}#c0392b{% endif %};">{{ survival.fcf | money }}/yr</td></tr>
+    </table>
+    <div style="font-size:12px;margin-bottom:4px;">{{ survival.verdict_msg }}</div>
+    <div style="font-size:12px;color:{% if survival.dil_cls == 'danger' %}#c0392b{% elif survival.dil_cls == 'success' %}#1a7a4a{% else %}#555{% endif %};">{{ survival.dil_msg }}</div>
+    {% if survival.fin_note %}<div style="font-size:12px;color:#c97d00;margin-top:4px;">{{ survival.fin_note }}</div>{% endif %}
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 6: CASH CONVERSION CYCLE
+════════════════════════════════════════════════════ -->
+<h2>6. Cash Conversion Cycle</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Metric</th>
+      <th>Formula</th>
+      <th class="r">{{ periods[0] }}</th>
+      {% if periods|length > 1 %}<th class="r">{{ periods[1] }}</th><th class="r">Change</th>{% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in ccc.rows %}
+    <tr {% if loop.last %}style="font-weight:600;background:#f5f8fc;"{% endif %}>
+      <td>{{ row.label }}</td>
+      <td style="color:#666;font-size:11px;">{{ row.formula }}</td>
+      <td class="r" style="font-family:monospace;">{{ "%.1f d"|format(row.cur) if row.cur is not none else "n/a" }}</td>
+      {% if periods|length > 1 %}
+      <td class="r" style="font-family:monospace;">{{ "%.1f d"|format(row.pri) if row.pri is not none else "n/a" }}</td>
+      <td class="r {{ 'pos' if row.cur is not none and row.pri is not none and row.cur < row.pri else ('neg' if row.cur is not none and row.pri is not none and row.cur > row.pri else 'neu') }}" style="font-family:monospace;">
+        {{ "%+.1f d"|format(row.cur - row.pri) if row.cur is not none and row.pri is not none else "n/a" }}
+      </td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p style="font-size:12px;color:{% if ccc.interp_cls == 'success' %}#1a7a4a{% elif ccc.interp_cls == 'danger' %}#c0392b{% elif ccc.interp_cls == 'warning' %}#c97d00{% else %}#555{% endif %};">{{ ccc.interp }}</p>
+{% if ccc.trend %}<p style="font-size:11px;color:#555;margin-top:4px;">YoY trend: <strong>{{ "%+.1f"|format(ccc.trend.delta) }} days</strong> — {{ ccc.trend.direction }}.</p>{% endif %}
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 7: OPERATING LEVERAGE
+════════════════════════════════════════════════════ -->
+<h2>7. Operating Leverage / Margin Expansion</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Metric</th>
+      <th class="r">{{ periods[0] }}</th>
+      {% if periods|length > 1 %}<th class="r">{{ periods[1] }}</th><th class="r">Change</th>{% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in leverage.rows %}
+    <tr>
+      <td>{{ row.label }}</td>
+      <td class="r" style="font-family:monospace;">{{ "%.1f%%"|format(row.cur) if row.cur is not none else "n/a" }}</td>
+      {% if periods|length > 1 %}
+      <td class="r" style="font-family:monospace;">{{ "%.1f%%"|format(row.pri) if row.pri is not none else "n/a" }}</td>
+      {% if row.cur is not none and row.pri is not none %}
+        {% set delta = row.cur - row.pri %}
+        {% set good = (delta >= 0) == row.good_up %}
+        <td class="r {{ 'pos' if good else 'neg' }}" style="font-family:monospace;">{{ "%+.1f pp"|format(delta) }}</td>
+      {% else %}
+        <td class="r neu">n/a</td>
+      {% endif %}
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if leverage.inc_gm is not none %}
+<h3>Incremental Margins</h3>
+<table style="max-width:400px;">
+  <tr><td>Incremental Gross Margin</td><td class="r" style="font-family:monospace;font-weight:600;">{{ "%.1f%%"|format(leverage.inc_gm) }}</td><td style="font-size:11px;color:#888;padding-left:8px;">target >= 75%</td></tr>
+  <tr><td>Incremental Operating Margin</td><td class="r" style="font-family:monospace;font-weight:600;">{{ "%.1f%%"|format(leverage.inc_om) }}</td><td style="font-size:11px;color:#888;padding-left:8px;">target >= 25%</td></tr>
+</table>
+{% if leverage.signal %}
+<p style="font-size:12px;font-weight:600;color:{% if leverage.signal.cls == 'success' %}#1a7a4a{% elif leverage.signal.cls == 'danger' %}#c0392b{% else %}#c97d00{% endif %};">{{ leverage.signal.text }}</p>
+{% endif %}
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 8: BALANCE SHEET HEALTH
+════════════════════════════════════════════════════ -->
+<h2>8. Balance Sheet Health Check</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Ratio</th>
+      <th>Formula</th>
+      <th>Target</th>
+      <th class="r">{{ periods[0] }}</th>
+      {% if periods|length > 1 %}<th class="r">{{ periods[1] }}</th>{% endif %}
+      <th>Signal</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in bhealth.ratios %}
+    <tr>
+      <td style="font-weight:600;">{{ r.label }}</td>
+      <td style="color:#666;font-size:11px;">{{ r.formula }}</td>
+      <td style="font-size:11px;">{{ r.threshold }}</td>
+      <td class="r" style="font-family:monospace;">{{ "%.2f"|format(r.cur) if r.cur is not none else "n/a" }}</td>
+      {% if periods|length > 1 %}<td class="r" style="font-family:monospace;">{{ "%.2f"|format(r.pri) if r.pri is not none else "n/a" }}</td>{% endif %}
+      <td><span class="badge badge-{{ 'pass' if r.sig_cls == 'ok' else ('warn' if r.sig_cls == 'warn' else 'fail') }}">{{ r.sig_txt }}</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<h3>Yellow Flags</h3>
+{% if bhealth.flags %}
+  {% for f in bhealth.flags %}
+  <div style="font-size:12px;margin-bottom:5px;padding:5px 8px;border-left:3px solid {% if f.cls == 'danger' %}#c0392b{% else %}#c97d00{% endif %};background:#fafafa;">
+    <strong>{{ f.title }}:</strong> {{ f.detail }}
+  </div>
+  {% endfor %}
+{% else %}
+<p style="font-size:12px;color:#1a7a4a;">[OK] No yellow flags raised.</p>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 9: INCOME STATEMENT SCANNER
+════════════════════════════════════════════════════ -->
+<h2>9. Income Statement Scanner</h2>
+<div style="margin-bottom:10px;">
+  Revenue growth: <strong style="color:{% if income_scan.growth and income_scan.growth >= 25 %}#1a7a4a{% elif income_scan.growth and income_scan.growth <= 10 %}#c97d00{% else %}#1a3a5c{% endif %};">
+    {{ "%+.1f%%"|format(income_scan.growth) if income_scan.growth is not none else "n/a" }}</strong>
+  &nbsp; {{ income_scan.band_txt }}
+  &nbsp;|&nbsp; <strong>{{ income_scan.flags_raised }} / 4</strong> flags raised
+</div>
+<h3>Margin Trends</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Margin</th>
+      <th class="r">{{ periods[0] }}</th>
+      {% if periods|length > 1 %}<th class="r">{{ periods[1] }}</th><th>Trend</th>{% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in income_scan.margins %}
+    <tr>
+      <td>{{ row.label }}</td>
+      <td class="r" style="font-family:monospace;">{{ "%.1f%%"|format(row.cur) if row.cur is not none else "n/a" }}</td>
+      {% if periods|length > 1 %}
+      <td class="r" style="font-family:monospace;">{{ "%.1f%%"|format(row.pri) if row.pri is not none else "n/a" }}</td>
+      {% if row.cur is not none and row.pri is not none %}
+        {% set up = row.cur > row.pri %}
+        {% set good = up == row.good_up %}
+        <td class="{{ 'pos' if good else 'neg' }}">{{ "^" if up else "v" }}</td>
+      {% else %}<td class="neu">--</td>{% endif %}
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<h3>Yellow Flags</h3>
+<table>
+  <thead><tr><th>Flag</th><th>Detail</th><th>Status</th></tr></thead>
+  <tbody>
+    {% for f in income_scan.flags %}
+    <tr>
+      <td style="font-weight:600;">{{ f.label }}</td>
+      <td style="color:#666;font-size:11px;">{{ f.detail }}</td>
+      <td><span class="badge badge-{{ 'fail' if f.status == 'FLAG' else ('warn' if f.status == 'WATCH' else 'pass') }}">{{ f.status }}</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 10: CONSISTENCY TRACKER
+════════════════════════════════════════════════════ -->
+<h2>10. Multi-Year Consistency Tracker</h2>
+{% if consistency.period_count < 3 %}
+<p style="font-size:12px;color:#c97d00;margin-bottom:8px;">[!] Only {{ consistency.period_count }} period(s) captured — analyze 3+ periods for a meaningful consistency read.</p>
+{% endif %}
+<table>
+  <thead>
+    <tr>
+      <th>Metric (threshold)</th>
+      {% for lbl in consistency.labels %}<th class="r"><span class="pbadge">{{ lbl }}</span></th>{% endfor %}
+      <th class="r">Holds</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in consistency.rows %}
+    <tr>
+      <td>{{ row.label }} <span style="color:#888;font-size:11px;">({{ row.threshold }})</span></td>
+      {% for v in row.vals %}
+      <td class="r" style="font-family:monospace;">
+        {% if v is not none %}{{ "%.1f%%"|format(v) if row.fmt == 'pct' else "%.2f"|format(v) }}{% else %}n/a{% endif %}
+      </td>
+      {% endfor %}
+      <td class="r">
+        <span class="badge badge-{{ 'pass' if row.verdict_cls == 'success' else ('warn' if row.verdict_cls == 'warning' else 'fail') }}">{{ row.passed }}/{{ row.total }}</span>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p style="font-size:12px;color:#555;">
+  Revenue trend: <strong>{{ consistency.revenue_trend }}</strong> &nbsp;|&nbsp;
+  Retained earnings trend: <strong>{{ consistency.re_trend }}</strong>
+</p>
+<p style="font-size:11px;color:#888;margin-top:4px;">A metric that clears its threshold every year — especially through a downturn — is far stronger than one that only clears it on average.</p>
+
 <!-- Footer -->
 <div class="footer">
   FinSight Financial Analysis Suite &nbsp;|&nbsp; {{ company }} &nbsp;|&nbsp; {{ generated }}
