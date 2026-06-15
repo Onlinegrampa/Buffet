@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, redirect, render_template, request, Response, url_for
+from flask import Flask, jsonify, redirect, render_template, request, Response, url_for
 
 from analyzers.balance_health import compute as balance_health_compute
 from analyzers.buffett import compute as buffett_compute
@@ -24,6 +24,7 @@ from analyzers.statements import (
     compute as stmt_compute,
 )
 from analyzers.survival import compute as survival_compute
+from utils.edgar import build_statements as edgar_build, get_filings as edgar_filings, search_companies
 from utils.profile import CompanyProfile
 
 app = Flask(__name__)
@@ -268,6 +269,93 @@ def reports_list() -> str:
 def delete_report(report_id: str):
     _delete_report(report_id)
     return redirect(url_for("reports_list"))
+
+
+# ── EDGAR routes ──────────────────────────────────────────────────────────────
+
+@app.route("/edgar")
+def edgar_page() -> str:
+    return render_template("edgar.html")
+
+
+@app.route("/edgar/search")
+def edgar_search():
+    q = request.args.get("q", "").strip()
+    if len(q) < 1:
+        return jsonify([])
+    try:
+        results = search_companies(q)
+        return jsonify(results)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/edgar/filings")
+def edgar_filings_route():
+    cik = request.args.get("cik", "").strip().zfill(10)
+    form_types = request.args.getlist("form") or ["10-K", "10-Q"]
+    try:
+        filings = edgar_filings(cik, form_types)
+        return jsonify(filings)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/edgar/analyze", methods=["POST"])
+def edgar_analyze():
+    cik = request.form.get("cik", "").strip().zfill(10)
+    raw = request.form.get("selected_filings", "[]")
+    try:
+        selected = json.loads(raw)
+    except json.JSONDecodeError:
+        return render_template("edgar.html", error="Invalid filing selection."), 400
+
+    if not selected:
+        return render_template("edgar.html", error="No filings selected — please choose at least one."), 400
+
+    selected = selected[:MAX_PERIODS]  # cap at 8
+
+    try:
+        company_name, period_labels, bs, inc, cf = edgar_build(cik, selected)
+    except Exception as exc:
+        return render_template("edgar.html", error=f"SEC EDGAR error: {exc}"), 502
+
+    profile = CompanyProfile(company_name, period_labels)
+    profile.balance_sheet    = bs
+    profile.income_statement = inc
+    profile.cash_flow        = cf
+
+    stmt        = stmt_compute(profile)
+    buft        = buffett_compute(profile.name, profile.buffett_inputs())
+    r40         = profile.rule_of_40_inputs()
+    growth      = r40["growth"] if r40["growth"] is not None else 0.0
+    saas_results = {
+        label: saas_compute(profile.name, growth, (m if m is not None else 0.0), label)
+        for label, m in r40["margins"].items()
+    }
+    stage       = stage_compute(profile)
+    survival    = survival_compute(profile)
+    ccc         = ccc_compute(profile)
+    leverage    = leverage_compute(profile)
+    bhealth     = balance_health_compute(profile)
+    income_scan = income_scan_compute(profile)
+    consistency = consistency_compute(profile)
+
+    data = dict(
+        company=company_name, periods=period_labels, stmt=stmt, buft=buft,
+        saas_results=saas_results, growth=growth,
+        stage=stage, survival=survival, ccc=ccc, leverage=leverage,
+        bhealth=bhealth, income_scan=income_scan, consistency=consistency,
+        unit_label="$M (Millions — from SEC EDGAR)",
+        generated=datetime.now().strftime("%B %d, %Y at %I:%M %p"),
+    )
+
+    report_id = str(uuid.uuid4())
+    _report_store[report_id] = data
+    html = render_template("report.html", **data)
+    _save_report(report_id, data, html)
+
+    return render_template("results.html", report_id=report_id, **data)
 
 
 if __name__ == "__main__":

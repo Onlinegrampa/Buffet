@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Import from SEC EDGAR — FinSight</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f0f2f5; }
+    .topbar {
+      background: linear-gradient(135deg, #0f1b2d 0%, #1a3a5c 100%);
+      color: white; padding: 14px 0;
+      position: sticky; top: 0; z-index: 1000;
+    }
+    .topbar a { color: rgba(255,255,255,.75); text-decoration: none; font-size: .88rem; }
+    .topbar a:hover { color: white; }
+
+    .card-main { border: none; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+
+    /* Search box */
+    #company-search { font-size: 1rem; padding: 10px 16px; border-radius: 8px 0 0 8px; }
+    #search-btn { border-radius: 0 8px 8px 0; }
+
+    /* Company result list */
+    .company-item {
+      cursor: pointer; padding: 10px 14px; border-radius: 7px;
+      transition: background .12s;
+    }
+    .company-item:hover, .company-item.selected { background: #e8f0fe; }
+    .company-item .ticker { font-weight: 700; color: #1a3a5c; min-width: 60px; display:inline-block; }
+    .company-item .name   { color: #444; font-size: .9rem; }
+
+    /* Filing list */
+    .filing-item {
+      padding: 8px 12px; border-radius: 6px; border: 1.5px solid #dee2e6;
+      cursor: pointer; transition: all .12s; margin-bottom: 6px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .filing-item:hover { border-color: #4a90d9; background: #f0f6ff; }
+    .filing-item input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: #1a3a5c; }
+    .filing-item label { cursor: pointer; margin: 0; flex: 1; font-size: .88rem; }
+    .form-badge {
+      font-size: .7rem; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+      white-space: nowrap;
+    }
+    .badge-10k { background: #d1e7dd; color: #0a3622; }
+    .badge-10q { background: #cfe2ff; color: #084298; }
+
+    /* Steps */
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%; background: #1a3a5c;
+      color: white; font-size: .8rem; font-weight: 700;
+      display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-disabled .step-num { background: #ccc; }
+    .step-disabled { opacity: .5; pointer-events: none; }
+
+    /* Filters */
+    .filter-btn { font-size: .8rem; padding: 3px 10px; }
+    .filter-btn.active { background: #1a3a5c; color: white; border-color: #1a3a5c; }
+
+    #loading-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 9999;
+      align-items: center; justify-content: center; flex-direction: column;
+    }
+    #loading-overlay.active { display: flex; }
+    .spinner-box { background: white; border-radius: 14px; padding: 36px 48px; text-align: center; }
+
+    #selected-count { font-size: .78rem; color: #555; }
+    .hint { font-size: .77rem; color: #888; }
+
+    #error-box { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading-overlay">
+  <div class="spinner-box">
+    <div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;"></div>
+    <div class="fw-semibold" id="loading-msg">Fetching SEC EDGAR data...</div>
+    <div class="text-muted small mt-1">This may take 10–30 seconds for the first search.</div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div class="container d-flex justify-content-between align-items-center">
+    <span class="fw-bold fs-5">FinSight <span class="opacity-60 fw-light fs-6">— Import from SEC EDGAR</span></span>
+    <div class="d-flex gap-3">
+      <a href="/reports">&#128202; Saved Reports</a>
+      <a href="/">&#9997; Manual Entry</a>
+    </div>
+  </div>
+</div>
+
+<div class="container py-4" style="max-width:860px;">
+
+  {% if error %}
+  <div class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert">
+    <span style="font-size:1.3rem;">&#9888;</span>
+    <div><strong>Error:</strong> {{ error }}</div>
+  </div>
+  {% endif %}
+
+  <div class="mb-4">
+    <h4 class="fw-bold mb-1">Import Financial Data from SEC EDGAR</h4>
+    <p class="text-muted small mb-0">
+      Search for any US public company by ticker or name, pick the filing periods you want to analyze,
+      and FinSight will automatically pull the numbers from the SEC's free XBRL database.
+      No manual data entry required.
+    </p>
+  </div>
+
+  <!-- ── Step 1: Search ─────────────────────────────────────────────────── -->
+  <div class="card-main card mb-3 p-4" id="step1">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="step-num">1</span>
+      <h6 class="fw-bold mb-0">Search for a company</h6>
+    </div>
+
+    <div class="input-group mb-2">
+      <input type="text" id="company-search" class="form-control"
+             placeholder="Enter ticker symbol or company name  (e.g. AAPL, Microsoft, Tesla)"
+             autocomplete="off"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();searchCompanies();}">
+      <button class="btn btn-primary px-4" id="search-btn" type="button" onclick="searchCompanies()">
+        Search
+      </button>
+    </div>
+    <p class="hint mb-3">Tip: Ticker search is instant. Name search scans 10,000+ US-listed companies.</p>
+
+    <div id="company-results" class="d-none">
+      <div class="fw-semibold small text-muted mb-2" id="results-header"></div>
+      <div id="company-list" class="d-flex flex-column gap-1"></div>
+    </div>
+
+    <div id="no-results" class="d-none text-muted small mt-2">
+      No companies found. Try a different ticker or spelling.
+    </div>
+  </div>
+
+  <!-- ── Step 2: Select filings ─────────────────────────────────────────── -->
+  <div class="card-main card mb-3 p-4 step-disabled" id="step2">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="step-num">2</span>
+      <h6 class="fw-bold mb-0">Select filing periods</h6>
+      <span class="ms-auto" id="selected-count"></span>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap" id="type-filters">
+      <span class="hint me-1">Show:</span>
+      <button class="btn btn-sm filter-btn active" data-form="10-K" onclick="toggleFilter(this)">
+        Annual (10-K)
+      </button>
+      <button class="btn btn-sm filter-btn active" data-form="10-Q" onclick="toggleFilter(this)">
+        Quarterly (10-Q)
+      </button>
+      <span class="hint ms-2">Select up to 8 periods (most recent first).</span>
+    </div>
+
+    <div id="filing-list"></div>
+
+    <div id="no-filings" class="d-none text-muted small mt-2">
+      No filings of the selected types found for this company.
+    </div>
+  </div>
+
+  <!-- ── Step 3: Analyze ────────────────────────────────────────────────── -->
+  <div class="card-main card p-4 step-disabled" id="step3">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="step-num">3</span>
+      <h6 class="fw-bold mb-0">Run analysis</h6>
+    </div>
+
+    <div id="selected-summary" class="text-muted small mb-3"></div>
+
+    <form id="analyze-form" action="/edgar/analyze" method="post">
+      <input type="hidden" name="cik" id="form-cik">
+      <input type="hidden" name="selected_filings" id="form-filings" value="[]">
+      <button type="submit" class="btn btn-success px-5 fw-semibold" id="analyze-btn" disabled>
+        Fetch &amp; Analyze &rarr;
+      </button>
+      <span class="hint ms-3">
+        FinSight will download the XBRL financial data and run all 10 analysis modules.
+      </span>
+    </form>
+  </div>
+
+  <div class="mt-4 hint text-center">
+    Data sourced from the SEC EDGAR XBRL database (data.sec.gov). Free, no API key required.
+    Coverage: most US-listed companies with filings from ~2009 onwards.
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let selectedCik  = null;
+  let selectedName = null;
+  let allFilings   = [];    // full list from server
+  let activeFilters = new Set(["10-K", "10-Q"]);
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function showLoading(msg) {
+    document.getElementById('loading-msg').textContent = msg || 'Fetching SEC EDGAR data...';
+    document.getElementById('loading-overlay').classList.add('active');
+  }
+  function hideLoading() {
+    document.getElementById('loading-overlay').classList.remove('active');
+  }
+
+  function enableStep(id) {
+    document.getElementById(id).classList.remove('step-disabled');
+  }
+
+  // ── Step 1: Company search ─────────────────────────────────────────────────
+  async function searchCompanies() {
+    const q = document.getElementById('company-search').value.trim();
+    if (!q) return;
+
+    showLoading('Searching SEC company database...');
+
+    try {
+      const resp = await fetch('/edgar/search?q=' + encodeURIComponent(q));
+      const data = await resp.json();
+      hideLoading();
+
+      const resultsDiv = document.getElementById('company-results');
+      const listDiv    = document.getElementById('company-list');
+      const noResults  = document.getElementById('no-results');
+
+      if (data.error) {
+        noResults.textContent = 'Error: ' + data.error;
+        noResults.classList.remove('d-none');
+        resultsDiv.classList.add('d-none');
+        return;
+      }
+
+      noResults.classList.add('d-none');
+
+      if (!data.length) {
+        noResults.classList.remove('d-none');
+        resultsDiv.classList.add('d-none');
+        return;
+      }
+
+      document.getElementById('results-header').textContent =
+        data.length + ' result' + (data.length > 1 ? 's' : '') + ' — click to select';
+      listDiv.innerHTML = data.map(c => `
+        <div class="company-item" onclick="selectCompany('${c.cik}', ${JSON.stringify(c.name)}, ${JSON.stringify(c.ticker)}, this)">
+          <span class="ticker">${c.ticker}</span>
+          <span class="name">${c.name}</span>
+        </div>
+      `).join('');
+      resultsDiv.classList.remove('d-none');
+    } catch (err) {
+      hideLoading();
+      alert('Search error: ' + err.message);
+    }
+  }
+
+  // ── Step 2: Select company → load filings ─────────────────────────────────
+  async function selectCompany(cik, name, ticker, el) {
+    // Highlight selection
+    document.querySelectorAll('.company-item').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+
+    selectedCik  = cik;
+    selectedName = name;
+
+    showLoading('Loading available filings for ' + ticker + '...');
+
+    try {
+      const resp = await fetch('/edgar/filings?cik=' + cik + '&form=10-K&form=10-Q');
+      const data = await resp.json();
+      hideLoading();
+
+      if (data.error) { alert('Error loading filings: ' + data.error); return; }
+
+      allFilings = data;
+      enableStep('step2');
+      renderFilings();
+      document.getElementById('form-cik').value = cik;
+    } catch (err) {
+      hideLoading();
+      alert('Error: ' + err.message);
+    }
+  }
+
+  // ── Filter toggle ──────────────────────────────────────────────────────────
+  function toggleFilter(btn) {
+    const form = btn.dataset.form;
+    if (activeFilters.has(form)) {
+      activeFilters.delete(form);
+      btn.classList.remove('active');
+    } else {
+      activeFilters.add(form);
+      btn.classList.add('active');
+    }
+    renderFilings();
+  }
+
+  // ── Render filing checkboxes ───────────────────────────────────────────────
+  function renderFilings() {
+    const listDiv = document.getElementById('filing-list');
+    const noDiv   = document.getElementById('no-filings');
+
+    const visible = allFilings.filter(f => activeFilters.has(f.form));
+
+    if (!visible.length) {
+      listDiv.innerHTML = '';
+      noDiv.classList.remove('d-none');
+      return;
+    }
+    noDiv.classList.add('d-none');
+
+    listDiv.innerHTML = visible.map((f, i) => `
+      <div class="filing-item" onclick="toggleCheck('filing-${i}')">
+        <input type="checkbox" id="filing-${i}"
+               data-idx="${i}" data-form="${f.form}" data-period="${f.period}"
+               onchange="updateSelection()" onclick="event.stopPropagation()">
+        <span class="form-badge ${f.form === '10-K' ? 'badge-10k' : 'badge-10q'}">${f.form}</span>
+        <label for="filing-${i}">${f.label}</label>
+        <span class="text-muted" style="font-size:.75rem;">Filed ${f.filed}</span>
+      </div>
+    `).join('');
+
+    // Auto-select the most recent 4 10-K filings by default
+    let autoCount = 0;
+    document.querySelectorAll('#filing-list input[type=checkbox]').forEach(cb => {
+      if (cb.dataset.form === '10-K' && autoCount < 4) {
+        cb.checked = true;
+        autoCount++;
+      }
+    });
+
+    updateSelection();
+  }
+
+  function toggleCheck(id) {
+    const cb = document.getElementById(id);
+    if (!cb) return;
+    cb.checked = !cb.checked;
+    updateSelection();
+  }
+
+  // ── Update selection summary + enable Step 3 ──────────────────────────────
+  function updateSelection() {
+    const checked = Array.from(
+      document.querySelectorAll('#filing-list input[type=checkbox]:checked')
+    );
+
+    // Enforce max 8
+    if (checked.length > 8) {
+      // Uncheck the last one that was checked (approximate: uncheck all beyond first 8)
+      let count = 0;
+      document.querySelectorAll('#filing-list input[type=checkbox]').forEach(cb => {
+        if (cb.checked) {
+          count++;
+          if (count > 8) cb.checked = false;
+        }
+      });
+    }
+
+    const selected = Array.from(
+      document.querySelectorAll('#filing-list input[type=checkbox]:checked')
+    ).map(cb => {
+      const idx = parseInt(cb.dataset.idx);
+      // Find the matching filing in the visible list
+      const visible = allFilings.filter(f => activeFilters.has(f.form));
+      return visible[idx];
+    }).filter(Boolean);
+
+    document.getElementById('selected-count').textContent =
+      selected.length + ' of max 8 selected';
+
+    // Build period labels for summary
+    const labels = selected.map(f => f.label).join(', ');
+    document.getElementById('selected-summary').textContent =
+      selected.length
+        ? 'Will analyze: ' + (selectedName || '') + '  |  Periods: ' + labels
+        : 'No periods selected yet.';
+
+    // Store as JSON for form submission
+    document.getElementById('form-filings').value = JSON.stringify(selected);
+
+    const analyzeBtn = document.getElementById('analyze-btn');
+    if (selected.length > 0) {
+      enableStep('step3');
+      analyzeBtn.disabled = false;
+    } else {
+      analyzeBtn.disabled = true;
+    }
+  }
+
+  // ── Show loading on form submit ────────────────────────────────────────────
+  document.getElementById('analyze-form').addEventListener('submit', function() {
+    showLoading('Fetching XBRL financial data from SEC EDGAR...');
+  });
+
+  // ── Allow Enter key in search box ─────────────────────────────────────────
+  document.getElementById('company-search').focus();
+</script>
+</body>
+</html>
